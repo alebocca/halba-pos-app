@@ -32,6 +32,7 @@ import java.util.Currency
 class MainActivity : AppCompatActivity() {
     private val api = HalbaApi(BuildConfig.HALBA_API)
     private lateinit var reader: StripeReader
+    private lateinit var secure: SecureStore
     private lateinit var root: LinearLayout
     private var loop: Job? = null
     private var busy = false //   pagamento in corso: il long-poll non apre altri comandi
@@ -48,10 +49,10 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(root)
         reader = StripeReader(api, lifecycleScope)
-        val prefs = getSharedPreferences("halba", MODE_PRIVATE)
-        // In produzione la chiave va nell'Android Keystore; qui (sandbox) nelle preferenze private dell'app
-        api.terminalId = prefs.getString("terminal", null)
-        api.deviceKey = prefs.getString("key", null)
+        // Chiave del dispositivo cifrata con l'Android Keystore (SecureStore)
+        secure = SecureStore(this)
+        api.deviceKey = secure.deviceKey()
+        api.terminalId = if (api.deviceKey != null) secure.terminalId else null
         // Stripe Terminal SDK 6: posizione approssimativa dall'Android 12 (precisa fino all'Android 11)
         val needed = buildList {
             add(if (Build.VERSION.SDK_INT >= 31) Manifest.permission.ACCESS_COARSE_LOCATION else Manifest.permission.ACCESS_FINE_LOCATION)
@@ -82,7 +83,7 @@ class MainActivity : AppCompatActivity() {
                     "paired" -> {
                         api.terminalId = s.getString("terminal")
                         api.deviceKey = s.getString("device_key")
-                        getSharedPreferences("halba", MODE_PRIVATE).edit().putString("terminal", api.terminalId).putString("key", api.deviceKey).apply()
+                        secure.save(api.terminalId!!, api.deviceKey!!)
                         connectAndWait()
                         return@launch
                     }
@@ -131,7 +132,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun forget() {
-        getSharedPreferences("halba", MODE_PRIVATE).edit().clear().apply()
+        secure.clear()
         api.terminalId = null
         api.deviceKey = null
         pair()

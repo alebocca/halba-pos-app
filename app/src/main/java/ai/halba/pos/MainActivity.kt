@@ -1,11 +1,9 @@
 package ai.halba.pos
 
-import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
-import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -31,7 +29,8 @@ import java.util.Currency
 // La cassa del merchant chiede il pagamento a halba (POST /v1/terminal_payments); halba lo passa a questa app.
 class MainActivity : AppCompatActivity() {
     private val api = HalbaApi(BuildConfig.HALBA_API)
-    private lateinit var reader: StripeReader
+    private lateinit var reader: CardReader
+    private var readerInfo = ""
     private lateinit var secure: SecureStore
     private lateinit var root: LinearLayout
     private var loop: Job? = null
@@ -48,16 +47,13 @@ class MainActivity : AppCompatActivity() {
             setPadding(48, 48, 48, 48)
         }
         setContentView(root)
-        reader = StripeReader(api, lifecycleScope)
+        reader = Psp.cardReader(api, lifecycleScope)
         // Chiave del dispositivo cifrata con l'Android Keystore (SecureStore)
         secure = SecureStore(this)
         api.deviceKey = secure.deviceKey()
         api.terminalId = if (api.deviceKey != null) secure.terminalId else null
-        // Stripe Terminal SDK 6: posizione approssimativa dall'Android 12 (precisa fino all'Android 11)
-        val needed = buildList {
-            add(if (Build.VERSION.SDK_INT >= 31) Manifest.permission.ACCESS_COARSE_LOCATION else Manifest.permission.ACCESS_FINE_LOCATION)
-            if (Build.VERSION.SDK_INT >= 31) { add(Manifest.permission.BLUETOOTH_CONNECT); add(Manifest.permission.BLUETOOTH_SCAN) }
-        }.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        // Permessi chiesti dall'SDK del PSP (Stripe: posizione e Bluetooth)
+        val needed = reader.permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isNotEmpty()) ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1) else start()
     }
 
@@ -97,10 +93,10 @@ class MainActivity : AppCompatActivity() {
 
     // --- Lettore e attesa dei comandi ---
     private fun connectAndWait(): Job = lifecycleScope.launch {
-        show("halba POS", "Connecting the card reader…")
+        show("halba POS", "Connecting the card reader…", sub = reader.label)
         try {
             reader.init(this@MainActivity)
-            if (!reader.connected) reader.connectSimulated()
+            if (!reader.connected) readerInfo = reader.connect()
         } catch (e: Exception) {
             show("Card reader unavailable", e.message ?: "Error", action = "Retry") { connectAndWait() }
             return@launch
@@ -110,7 +106,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun waitForCommands() {
         loop?.cancel()
-        show("halba POS", "Ready. Waiting for the till…", sub = "Terminal ${api.terminalId}")
+        show("halba POS", "Ready. Waiting for the till…", sub = listOf(readerInfo, "Terminal ${api.terminalId}").filter { it.isNotEmpty() }.joinToString("\n"))
         loop = lifecycleScope.launch {
             while (isActive) {
                 try {
@@ -153,16 +149,16 @@ class MainActivity : AppCompatActivity() {
         val methods = p.optJSONArray("methods")
         for (i in 0 until (methods?.length() ?: 0)) {
             val m = methods!!.getString(i)
-            if (m == "card" && p.optJSONObject("stripe") == null) continue
+            if (m == "card" && !reader.canPayByCard(p)) continue
             root.addView(button(labels[m] ?: m) { if (m == "card") payByCard(p) else payByQr(p, m) })
         }
     }
 
     private fun payByCard(p: JSONObject): Job = lifecycleScope.launch {
-        show(amountOf(p), "Tap, insert or swipe the card", sub = "Simulated reader: the card is presented automatically")
+        show(amountOf(p), "Tap, insert or swipe the card", sub = reader.cardHint)
         val id = p.getString("id")
         try {
-            reader.collect(p.getJSONObject("stripe").getString("client_secret"))
+            reader.collect(p)
             val r = api.result(id, "confirmed")
             finish(r)
         } catch (e: Exception) {

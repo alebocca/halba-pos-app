@@ -41,7 +41,7 @@ class HalbaApi(private val base: String) {
         }
 
     // Abbinamento: codice da dare al merchant, poi ritiro della chiave
-    suspend fun startPairing(): JSONObject = call("POST", "/v1/devices/pairings", JSONObject().put("provider", "stripe").put("model", android.os.Build.MODEL).put("app_version", BuildConfig.VERSION_NAME))
+    suspend fun startPairing(): JSONObject = call("POST", "/v1/devices/pairings", JSONObject().put("provider", BuildConfig.PSP).put("model", android.os.Build.MODEL).put("app_version", BuildConfig.VERSION_NAME))
     suspend fun pairingStatus(id: String, secret: String): JSONObject = call("GET", "/v1/devices/pairings/$id", headers = mapOf("X-Pairing-Secret" to secret))
 
     // Long-poll: risponde appena c'è un pagamento da incassare, al più dopo 25 secondi

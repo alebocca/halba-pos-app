@@ -15,7 +15,7 @@ class ScreenCache(private val context: Context, private val api: HalbaApi) {
     val file: File? get() = prefs.getString("file", null)?.let { File(dir, it) }?.takeIf { it.exists() }
 
     // Allinea il file a quello della configurazione; true se lo schermo è cambiato
-    suspend fun sync(screen: JSONObject?): Boolean {
+    suspend fun sync(screen: JSONObject?, progress: (Long, Long) -> Unit = { _, _ -> }): Boolean {
         if (screen == null) {
             val had = file != null
             clear()
@@ -27,7 +27,7 @@ class ScreenCache(private val context: Context, private val api: HalbaApi) {
         val url = screen.optString("url").takeIf { it.isNotEmpty() && it != "null" } ?: return false
         val ext = when (screen.optString("mime")) { "video/mp4" -> "mp4"; "image/png" -> "png"; "image/webp" -> "webp"; else -> "jpg" }
         val tmp = File(dir, "$id.part")
-        val sha = api.download(url, tmp)
+        val sha = api.download(url, tmp, progress)
         if (sha != screen.getString("sha256")) {
             tmp.delete()
             throw IOException("The screen file arrived damaged")
@@ -39,6 +39,10 @@ class ScreenCache(private val context: Context, private val api: HalbaApi) {
         api.ackMedia(id)
         return true
     }
+
+    // C'è uno schermo da scaricare (nuovo o diverso da quello salvato)
+    fun pending(screen: JSONObject?): Boolean =
+        screen != null && (screen.optString("id") != prefs.getString("id", null) || file == null) && screen.optString("url").let { it.isNotEmpty() && it != "null" }
 
     fun clear() {
         dir.listFiles()?.forEach { it.delete() }

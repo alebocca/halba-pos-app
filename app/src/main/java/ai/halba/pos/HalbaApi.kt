@@ -14,7 +14,8 @@ class HalbaApi(private val base: String) {
     // Il terminale dice a halba se è in carica (la dashboard avvisa il merchant quando non lo è)
     var charging: () -> Boolean? = { null }
 
-    class ApiError(val status: Int, message: String) : Exception(message)
+    // body: l'errore dell'API (per il PIN: attempts_left, locked_seconds)
+    class ApiError(val status: Int, message: String, val body: JSONObject = JSONObject()) : Exception(message)
 
     private suspend fun call(method: String, path: String, body: JSONObject? = null, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 15_000): JSONObject =
         withContext(Dispatchers.IO) {
@@ -39,7 +40,7 @@ class HalbaApi(private val base: String) {
             val text = (if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: "{}"
             conn.disconnect()
             val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-            if (status >= 400) throw ApiError(status, json.optJSONObject("error")?.optString("message") ?: "HTTP $status")
+            if (status >= 400) throw ApiError(status, json.optJSONObject("error")?.optString("message") ?: "HTTP $status", json.optJSONObject("error") ?: JSONObject())
             json
         }
 
@@ -70,14 +71,18 @@ class HalbaApi(private val base: String) {
     }
     suspend fun verifyPin(pin: String): JSONObject = call("POST", "/v1/devices/staff/verify", JSONObject().put("pin", pin))
     suspend fun ackMedia(id: String): JSONObject = call("POST", "/v1/devices/media/$id/ack", JSONObject())
+    // Pagamento di prova di 1,00 della configurazione guidata (solo in test): stesso formato del comando della cassa
+    suspend fun testPayment(currency: String): JSONObject = call("POST", "/v1/devices/test_payment", JSONObject().put("currency", currency))
 
     // Scarica il file dello schermo a riposo (link firmato dello Storage, senza chiave del dispositivo) e ne dà lo SHA-256
-    suspend fun download(url: String, dest: java.io.File): String = withContext(Dispatchers.IO) {
+    suspend fun download(url: String, dest: java.io.File, progress: (Long, Long) -> Unit = { _, _ -> }): String = withContext(Dispatchers.IO) {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 60_000
         if (conn.responseCode >= 400) throw ApiError(conn.responseCode, "Screen download failed")
         val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val total = conn.contentLengthLong
+        var read = 0L
         conn.inputStream.use { input ->
             dest.outputStream().use { out ->
                 val buf = ByteArray(64 * 1024)
@@ -86,6 +91,8 @@ class HalbaApi(private val base: String) {
                     if (n < 0) break
                     digest.update(buf, 0, n)
                     out.write(buf, 0, n)
+                    read += n
+                    progress(read, total)
                 }
             }
         }

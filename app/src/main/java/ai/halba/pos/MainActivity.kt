@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Schermo sempre acceso finché l'app è in primo piano (nessun permesso: è un'opzione della finestra)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        container = FrameLayout(this).apply { setBackgroundColor(Color.parseColor("#F9F9F7")) }
+        container = FrameLayout(this).apply { setBackgroundColor(Halba.SURFACE) }
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -161,7 +161,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val stores = api.stores().optJSONArray("data")
             page()
-            root.addView(text("Which store is this terminal in?", 24f, Color.BLACK, bold = true))
+            root.addView(text("Which store is this terminal in?", 24f, Halba.INK, bold = true))
             val name = EditText(this@MainActivity).apply {
                 hint = "Terminal name"
                 // All'abbinamento il nome è il modello del dispositivo: si propone un nome da cassa
@@ -169,10 +169,10 @@ class MainActivity : AppCompatActivity() {
                 textSize = 18f
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             }
-            root.addView(text("Name of this terminal", 14f, Color.parseColor("#5B5B66")))
+            root.addView(text("Name of this terminal", 14f, Halba.INK_MUTED))
             root.addView(name)
             if (stores == null || stores.length() == 0) {
-                root.addView(text("No stores yet: add one in halba (Connections > your PSP > Add store)", 16f, Color.parseColor("#B42318")))
+                root.addView(text("No stores yet: add one in halba (Connections > your PSP > Add store)", 16f, Halba.DANGER))
                 root.addView(button("Reload") { chooseStore(cfg, pin) })
                 return@launch
             }
@@ -283,25 +283,26 @@ class MainActivity : AppCompatActivity() {
             container.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setBackgroundColor(Color.parseColor("#14121F"))
-                addView(text("halba", 56f, Color.WHITE, bold = true))
-                addView(text(config?.optJSONObject("store")?.optString("name") ?: "", 18f, Color.parseColor("#A8A8B3")))
+                setBackgroundColor(Halba.DARK_SURFACE)
+                addView(HalbaMark(this@MainActivity, ring = Halba.DARK_INK, dot = 0xFFA99BFF.toInt()), LinearLayout.LayoutParams(Halba.dp(this@MainActivity, 96f).toInt(), Halba.dp(this@MainActivity, 96f).toInt()))
+                addView(text("halba", 40f, Halba.DARK_INK, bold = true))
+                addView(text(config?.optJSONObject("store")?.optString("name") ?: "", 18f, Halba.DARK_INK_MUTED))
             }, full)
         }
         chargingBanner = TextView(this).apply {
             text = "Connect the terminal to power: without it the till may not reach it"
             textSize = 15f
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#B42318"))
-            setPadding(32, 24, 32, 24)
+            setBackgroundColor(Halba.DANGER)
+            setPadding(32, 96, 32, 24) //  sotto la barra di stato
             gravity = Gravity.CENTER
         }
         container.addView(chargingBanner, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP))
         statusView = TextView(this).apply {
             textSize = 12f
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#99000000"))
-            setPadding(24, 12, 24, 12)
+            background = Halba.pill(context, 0x99000000.toInt())
+            setPadding(32, 16, 32, 16)
             contentDescription = "Terminal status. Staff: hold for 3 seconds to open the menu"
             // Menu del personale: pressione di 3 secondi sull'indicatore
             val hold = Handler(Looper.getMainLooper())
@@ -320,7 +321,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus() {
         statusView?.text = listOfNotNull(if (online) "● Online" else "● Offline", config?.optJSONObject("store")?.optString("name")).joinToString(" · ")
-        statusView?.setTextColor(if (online) Color.WHITE else Color.parseColor("#FF8A7D"))
+        statusView?.setTextColor(if (online) Color.WHITE else Halba.DARK_DANGER)
         chargingBanner?.visibility = if (isCharging()) View.GONE else View.VISIBLE
     }
 
@@ -395,8 +396,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPayment(p: JSONObject) {
         page()
-        root.addView(text(p.optString("merchant_reference"), 16f, Color.parseColor("#5B5B66")))
-        root.addView(text(amountOf(p), 44f, Color.BLACK, bold = true))
+        root.addView(text(p.optString("merchant_reference"), 16f, Halba.INK_MUTED))
+        root.addView(text(amountOf(p), 44f, Halba.INK, bold = true))
         val methods = p.optJSONArray("methods")
         for (i in 0 until (methods?.length() ?: 0)) {
             val m = methods!!.getString(i)
@@ -422,8 +423,8 @@ class MainActivity : AppCompatActivity() {
         try {
             val r = api.qr(id, method)
             page()
-            root.addView(text(amountOf(p), 36f, Color.BLACK, bold = true))
-            root.addView(text("Scan with ${labels[method] ?: method}", 18f, Color.parseColor("#5B5B66")))
+            root.addView(text(amountOf(p), 36f, Halba.INK, bold = true))
+            root.addView(text("Scan with ${labels[method] ?: method}", 18f, Halba.INK_MUTED))
             root.addView(ImageView(this@MainActivity).apply { setImageBitmap(qrBitmap(r.getString("qr"), 720)); adjustViewBounds = true })
             while (isActive) {
                 delay(2000)
@@ -443,7 +444,7 @@ class MainActivity : AppCompatActivity() {
             ok -> "Paid"
             else -> r.optJSONObject("failure")?.optString("message") ?: r.optString("status")
         }
-        show(if (ok) "Payment approved" else "Payment not completed", detail, color = if (ok) Color.parseColor("#0F766E") else Color.parseColor("#B42318"))
+        show(if (ok) "Payment approved" else "Payment not completed", detail, color = if (ok) Halba.SUCCESS else Halba.DANGER)
         lifecycleScope.launch { delay(4000); busy = false; waitForCommands() }
     }
 
@@ -453,19 +454,24 @@ class MainActivity : AppCompatActivity() {
         statusView = null
         chargingBanner = null
         container.removeAllViews()
-        container.setBackgroundColor(Color.parseColor("#F9F9F7"))
+        container.setBackgroundColor(Halba.SURFACE)
         root.removeAllViews()
         (root.parent as? android.view.ViewGroup)?.removeView(root) //  la pagina precedente lo teneva nel suo ScrollView
         container.addView(ScrollView(this).apply { isFillViewport = true; addView(root) })
     }
 
-    private fun show(title: String, body: String, big: String? = null, sub: String? = null, color: Int = Color.BLACK, action: String? = null, onAction: (() -> Unit)? = null) {
+    private fun show(title: String, body: String, big: String? = null, sub: String? = null, color: Int = Halba.INK, action: String? = null, onAction: (() -> Unit)? = null) {
         page()
+        // Attesa (nessuna azione, testo che finisce con "…"): loader con il marchio, come nel checkout
+        if (action == null && body.endsWith("…")) {
+            val size = Halba.dp(this, 56f).toInt()
+            root.addView(HalbaMark(this, spin = true), LinearLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = Halba.dp(this@MainActivity, 16f).toInt() })
+        }
         root.addView(text(title, 24f, color, bold = true))
-        root.addView(text(body, 18f, Color.parseColor("#5B5B66")))
-        if (big != null) root.addView(text(big, 48f, Color.parseColor("#3E37D6"), bold = true, mono = true))
-        if (sub != null) root.addView(text(sub, 12f, Color.parseColor("#8A8A94")))
-        if (action != null && onAction != null) root.addView(button(action, onAction))
+        root.addView(text(body, 18f, Halba.INK_MUTED))
+        if (big != null) root.addView(text(big, 48f, Halba.BRAND, bold = true, mono = true))
+        if (sub != null) root.addView(text(sub, 12f, Halba.INK_MUTED))
+        if (action != null && onAction != null) root.addView(button(action, primary = true, onClick = onAction))
     }
 
     private fun text(s: String, size: Float, color: Int, bold: Boolean = false, mono: Boolean = false) = TextView(this).apply {
@@ -478,10 +484,15 @@ class MainActivity : AppCompatActivity() {
         if (mono) letterSpacing = 0.15f
     }
 
-    private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
+    // Pulsante del design system: primario (brand) o secondario (bordo forte), raggio 12 dp, almeno 56 dp di altezza
+    private fun button(label: String, primary: Boolean = false, onClick: () -> Unit) = Button(this).apply {
         text = label
         textSize = 18f
         isAllCaps = false
+        stateListAnimator = null
+        background = if (primary) Halba.primary(context) else Halba.secondary(context)
+        setTextColor(if (primary) Halba.ON_BRAND else Halba.INK)
+        typeface = Typeface.DEFAULT_BOLD
         minHeight = 168 //  circa 56 dp: bersagli grandi
         setOnClickListener { onClick() }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 16 }

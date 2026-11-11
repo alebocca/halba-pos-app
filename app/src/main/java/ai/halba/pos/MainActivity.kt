@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
                     val first = cmds?.optJSONObject(0)
                     if (first != null && first.optString("type") == "payment.start" && !busy) {
                         busy = true
-                        showPayment(first.getJSONObject("payment"))
+                        start(first.getJSONObject("payment"))
                         return@launch
                     }
                 } catch (e: HalbaApi.ApiError) {
@@ -140,6 +140,16 @@ class MainActivity : AppCompatActivity() {
         val cur = Currency.getInstance(a.getString("currency"))
         val f = NumberFormat.getCurrencyInstance().apply { currency = cur }
         return f.format(a.getLong("value") / Math.pow(10.0, cur.defaultFractionDigits.toDouble()))
+    }
+
+    // Metodo scelto dalla cassa (payment_method nella richiesta): si va dritti a quel pagamento, senza chiederlo
+    // di nuovo al cliente; altrimenti si mostra la scelta
+    private fun start(p: JSONObject) {
+        when (val m = p.optString("method").takeIf { it.isNotEmpty() && it != "null" }) {
+            null -> showPayment(p)
+            "card" -> if (reader.canPayByCard(p)) payByCard(p) else finish(JSONObject().put("status", "failed").put("failure", JSONObject().put("message", "Cards are not available on this terminal")))
+            else -> payByQr(p, m)
+        }
     }
 
     private fun showPayment(p: JSONObject) {

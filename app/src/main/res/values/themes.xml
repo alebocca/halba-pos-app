@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.HalbaPos" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">#3E37D6</item>
-        <item name="android:windowBackground">#F9F9F7</item>
+        <item name="colorPrimary">#5B47E0</item>
+        <item name="android:windowBackground">#0E0E10</item>
     </style>
 </resources>

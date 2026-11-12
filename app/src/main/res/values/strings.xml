@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testi del design system (project/terminal.md, 8.2). Segnaposto tra graffe: li riempie l'app. -->
+<resources>
+    <string name="terminal_welcome_title" formatted="false">Welcome to halba</string>
+    <string name="terminal_welcome_text" formatted="false">Choose your language</string>
+    <string name="terminal_continue" formatted="false">Continue</string>
+    <string name="terminal_back" formatted="false">Back</string>
+    <string name="terminal_step" formatted="false">Step {n} of {t}</string>
+    <string name="terminal_pair_title" formatted="false">Pair this terminal</string>
+    <string name="terminal_pair_help" formatted="false">In halba, open Connections &gt; your PSP &gt; Add terminal and enter this code</string>
+    <string name="terminal_pair_wait" formatted="false">Waiting for pairing…</string>
+    <string name="terminal_pair_expired" formatted="false">This code has expired</string>
+    <string name="terminal_pair_new" formatted="false">Here is a new code. Enter it in halba instead.</string>
+    <string name="terminal_net_title" formatted="false">No connection</string>
+    <string name="terminal_net_text" formatted="false">Check the network cable or Wi-Fi. We will try again by ourselves.</string>
+    <string name="terminal_retry" formatted="false">Try again</string>
+    <string name="terminal_store_title" formatted="false">Choose the store</string>
+    <string name="terminal_store_search" formatted="false">Search stores</string>
+    <string name="terminal_store_code" formatted="false">Store code {c}</string>
+    <string name="terminal_name_title" formatted="false">Name this terminal</string>
+    <string name="terminal_name_label" formatted="false">Terminal name</string>
+    <string name="terminal_name_value" formatted="false">Till 1</string>
+    <string name="terminal_reader_title" formatted="false">Check the card reader</string>
+    <string name="terminal_reader_connecting" formatted="false">Connecting to the reader…</string>
+    <string name="terminal_reader_ready" formatted="false">Reader ready</string>
+    <string name="terminal_reader_missing" formatted="false">Reader not found</string>
+    <string name="terminal_reader_help" formatted="false">Restart the terminal and try again. If it keeps failing, contact your provider.</string>
+    <string name="terminal_idle_title" formatted="false">Idle screen</string>
+    <string name="terminal_idle_dl" formatted="false">Downloading your idle screen</string>
+    <string name="terminal_idle_none_title" formatted="false">No idle screen yet</string>
+    <string name="terminal_idle_none_text" formatted="false">The terminal will show this screen. To show your own image or video, upload one in halba under Terminals &gt; Idle screen.</string>
+    <string name="terminal_test_title" formatted="false">Test payment</string>
+    <string name="terminal_test_text" formatted="false">Test mode is on. Try a payment of {amt} with a test card.</string>
+    <string name="terminal_test_start" formatted="false">Start test payment</string>
+    <string name="terminal_skip" formatted="false">Skip</string>
+    <string name="terminal_test_ok" formatted="false">Test payment approved</string>
+    <string name="terminal_done_title" formatted="false">All set</string>
+    <string name="terminal_done_store" formatted="false">Store</string>
+    <string name="terminal_done_name" formatted="false">Name</string>
+    <string name="terminal_done_psp" formatted="false">PSP</string>
+    <string name="terminal_start" formatted="false">Start</string>
+    <string name="terminal_ind_online" formatted="false">Online</string>
+    <string name="terminal_ind_offline" formatted="false">Offline</string>
+    <string name="terminal_ind_power" formatted="false">Connect the terminal to power</string>
+    <string name="terminal_ref" formatted="false">Order {r}</string>
+    <string name="terminal_m_card" formatted="false">Card</string>
+    <string name="terminal_m_card_sub" formatted="false">Tap, insert or swipe</string>
+    <string name="terminal_or_qr" formatted="false">Or pay with a QR code</string>
+    <string name="terminal_cancel" formatted="false">Cancel</string>
+    <string name="terminal_card_tap" formatted="false">Tap, insert or swipe the card</string>
+    <string name="terminal_card_amount_lbl" formatted="false">Amount to pay</string>
+    <string name="terminal_card_open" formatted="false">Opening the card reader…</string>
+    <string name="terminal_card_extern" formatted="false">Card reader screen</string>
+    <string name="terminal_card_extern_sub" formatted="false">Shown by the PSP app, not by halba</string>
+    <string name="terminal_card_back" formatted="false">Back from the reader</string>
+    <string name="terminal_processing" formatted="false">Processing…</string>
+    <string name="terminal_processing_sub" formatted="false">Keep the card in place.</string>
+    <string name="terminal_qr_scan" formatted="false">Scan with {m}</string>
+    <string name="terminal_qr_left" formatted="false">Time left</string>
+    <string name="terminal_qr_soon" formatted="false">Expires soon</string>
+    <string name="terminal_qr_wait" formatted="false">Waiting for payment…</string>
+    <string name="terminal_qr_confirm" formatted="false">Confirm in the {m} app</string>
+    <string name="terminal_qr_expired" formatted="false">QR code expired</string>
+    <string name="terminal_qr_new" formatted="false">New QR code</string>
+    <string name="terminal_qr_alt" formatted="false">QR code to pay with {m}. Time left {t}.</string>
+    <string name="terminal_ok_title" formatted="false">Payment approved</string>
+    <string name="terminal_ok_contactless" formatted="false">Contactless</string>
+    <string name="terminal_ok_chip" formatted="false">Chip</string>
+    <string name="terminal_ok_qr" formatted="false">QR code</string>
+    <string name="terminal_ok_back_in" formatted="false">Back to the start in {s} s</string>
+    <string name="terminal_fail_declined" formatted="false">Card declined</string>
+    <string name="terminal_fail_declined_do" formatted="false">Try another card or ask the cashier for another way to pay.</string>
+    <string name="terminal_fail_canceled" formatted="false">Payment canceled</string>
+    <string name="terminal_fail_canceled_do" formatted="false">Nothing was charged.</string>
+    <string name="terminal_fail_timeout" formatted="false">Payment timed out</string>
+    <string name="terminal_fail_timeout_do" formatted="false">Nothing was charged. Ask the cashier to start again.</string>
+    <string name="terminal_fail_read" formatted="false">Card could not be read</string>
+    <string name="terminal_fail_read_do" formatted="false">Try again or use another card.</string>
+    <string name="terminal_canceled_till" formatted="false">Canceled by the cashier</string>
+    <string name="terminal_canceled_till_do" formatted="false">Nothing was charged.</string>
+    <string name="terminal_pin_title" formatted="false">Staff PIN</string>
+    <string name="terminal_pin_enter" formatted="false">Enter the 6-digit PIN</string>
+    <string name="terminal_pin_wrong" formatted="false">Wrong PIN. {n} attempts left.</string>
+    <string name="terminal_pin_locked" formatted="false">Too many attempts</string>
+    <string name="terminal_pin_locked_text" formatted="false">Try again in {t}.</string>
+    <string name="terminal_pin_digits" formatted="false">{n} of 6 digits entered</string>
+    <string name="terminal_pin_delete" formatted="false">Delete</string>
+    <string name="terminal_menu_title" formatted="false">Staff menu</string>
+    <string name="terminal_menu_close" formatted="false">Close menu</string>
+    <string name="terminal_i_store" formatted="false">Store</string>
+    <string name="terminal_i_name" formatted="false">Name</string>
+    <string name="terminal_i_id" formatted="false">Terminal ID</string>
+    <string name="terminal_i_psp" formatted="false">PSP</string>
+    <string name="terminal_i_app" formatted="false">App version</string>
+    <string name="terminal_i_status" formatted="false">Status</string>
+    <string name="terminal_i_contact" formatted="false">Last contact</string>
+    <string name="terminal_i_contact_v" formatted="false">12 s ago</string>
+    <string name="terminal_menu_setup" formatted="false">Set up again</string>
+    <string name="terminal_menu_refresh" formatted="false">Refresh idle screen</string>
+    <string name="terminal_menu_unpair" formatted="false">Unpair terminal</string>
+    <string name="terminal_menu_exit" formatted="false">Exit app</string>
+    <string name="terminal_c_unpair_t" formatted="false">Unpair this terminal?</string>
+    <string name="terminal_c_unpair_x" formatted="false">It will stop receiving payments and will need a new pairing code.</string>
+    <string name="terminal_c_unpair_ok" formatted="false">Unpair</string>
+    <string name="terminal_c_exit_t" formatted="false">Exit the app?</string>
+    <string name="terminal_c_exit_x" formatted="false">The till will not reach this terminal until the app is opened again.</string>
+    <string name="terminal_c_exit_ok" formatted="false">Exit app</string>
+    <string name="terminal_c_setup_t" formatted="false">Set up this terminal again?</string>
+    <string name="terminal_c_setup_x" formatted="false">You will choose the store and the name again. The pairing stays.</string>
+    <string name="terminal_c_setup_ok" formatted="false">Set up again</string>
+    <string name="terminal_off_title" formatted="false">This terminal was turned off</string>
+    <string name="terminal_off_text" formatted="false">It was turned off in halba. Pair it again to use it.</string>
+    <string name="terminal_off_btn" formatted="false">Pair again</string>
+    <string name="terminal_nonet_title" formatted="false">No connection</string>
+    <string name="terminal_nonet_text" formatted="false">The till cannot send payments to this terminal right now.</string>
+    <string name="terminal_nonet_try" formatted="false">Trying again…</string>
+    <string name="terminal_boot" formatted="false">Starting halba</string>
+</resources>

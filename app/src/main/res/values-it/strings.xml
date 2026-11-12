@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testi del design system (project/terminal.md, 8.2). Segnaposto tra graffe: li riempie l'app. -->
+<resources>
+    <string name="terminal_welcome_title" formatted="false">Benvenuto in halba</string>
+    <string name="terminal_welcome_text" formatted="false">Scegli la lingua</string>
+    <string name="terminal_continue" formatted="false">Continua</string>
+    <string name="terminal_back" formatted="false">Indietro</string>
+    <string name="terminal_step" formatted="false">Passo {n} di {t}</string>
+    <string name="terminal_pair_title" formatted="false">Abbina questo terminale</string>
+    <string name="terminal_pair_help" formatted="false">In halba apri Connessioni &gt; il tuo PSP &gt; Aggiungi terminale e inserisci questo codice</string>
+    <string name="terminal_pair_wait" formatted="false">In attesa dell’abbinamento…</string>
+    <string name="terminal_pair_expired" formatted="false">Questo codice è scaduto</string>
+    <string name="terminal_pair_new" formatted="false">Ecco un nuovo codice. Inseriscilo in halba al suo posto.</string>
+    <string name="terminal_net_title" formatted="false">Nessuna connessione</string>
+    <string name="terminal_net_text" formatted="false">Controlla il cavo di rete o il Wi-Fi. Riproviamo da soli.</string>
+    <string name="terminal_retry" formatted="false">Riprova</string>
+    <string name="terminal_store_title" formatted="false">Scegli il negozio</string>
+    <string name="terminal_store_search" formatted="false">Cerca negozi</string>
+    <string name="terminal_store_code" formatted="false">Codice negozio {c}</string>
+    <string name="terminal_name_title" formatted="false">Dai un nome al terminale</string>
+    <string name="terminal_name_label" formatted="false">Nome del terminale</string>
+    <string name="terminal_name_value" formatted="false">Cassa 1</string>
+    <string name="terminal_reader_title" formatted="false">Controlla il lettore di carte</string>
+    <string name="terminal_reader_connecting" formatted="false">Collegamento al lettore…</string>
+    <string name="terminal_reader_ready" formatted="false">Lettore pronto</string>
+    <string name="terminal_reader_missing" formatted="false">Lettore non trovato</string>
+    <string name="terminal_reader_help" formatted="false">Riavvia il terminale e riprova. Se continua, contatta il tuo fornitore.</string>
+    <string name="terminal_idle_title" formatted="false">Schermo a riposo</string>
+    <string name="terminal_idle_dl" formatted="false">Scarico lo schermo a riposo</string>
+    <string name="terminal_idle_none_title" formatted="false">Ancora nessuno schermo a riposo</string>
+    <string name="terminal_idle_none_text" formatted="false">Il terminale mostrerà questo schermo. Per mostrare una tua immagine o un video, caricali in halba in Terminali &gt; Schermo a riposo.</string>
+    <string name="terminal_test_title" formatted="false">Pagamento di prova</string>
+    <string name="terminal_test_text" formatted="false">La modalità test è attiva. Prova un pagamento di {amt} con una carta di prova.</string>
+    <string name="terminal_test_start" formatted="false">Avvia pagamento di prova</string>
+    <string name="terminal_skip" formatted="false">Salta</string>
+    <string name="terminal_test_ok" formatted="false">Pagamento di prova approvato</string>
+    <string name="terminal_done_title" formatted="false">Tutto pronto</string>
+    <string name="terminal_done_store" formatted="false">Negozio</string>
+    <string name="terminal_done_name" formatted="false">Nome</string>
+    <string name="terminal_done_psp" formatted="false">PSP</string>
+    <string name="terminal_start" formatted="false">Avvia</string>
+    <string name="terminal_ind_online" formatted="false">Online</string>
+    <string name="terminal_ind_offline" formatted="false">Offline</string>
+    <string name="terminal_ind_power" formatted="false">Collega il terminale all’alimentazione</string>
+    <string name="terminal_ref" formatted="false">Ordine {r}</string>
+    <string name="terminal_m_card" formatted="false">Carta</string>
+    <string name="terminal_m_card_sub" formatted="false">Avvicina, inserisci o striscia</string>
+    <string name="terminal_or_qr" formatted="false">Oppure paga con un codice QR</string>
+    <string name="terminal_cancel" formatted="false">Annulla</string>
+    <string name="terminal_card_tap" formatted="false">Avvicina, inserisci o striscia la carta</string>
+    <string name="terminal_card_amount_lbl" formatted="false">Importo da pagare</string>
+    <string name="terminal_card_open" formatted="false">Apertura del lettore di carte…</string>
+    <string name="terminal_card_extern" formatted="false">Schermata del lettore di carte</string>
+    <string name="terminal_card_extern_sub" formatted="false">Mostrata dall’app del PSP, non da halba</string>
+    <string name="terminal_card_back" formatted="false">Ritorno dal lettore</string>
+    <string name="terminal_processing" formatted="false">Elaborazione in corso…</string>
+    <string name="terminal_processing_sub" formatted="false">Tieni la carta dov’è.</string>
+    <string name="terminal_qr_scan" formatted="false">Inquadra con {m}</string>
+    <string name="terminal_qr_left" formatted="false">Tempo rimasto</string>
+    <string name="terminal_qr_soon" formatted="false">Sta per scadere</string>
+    <string name="terminal_qr_wait" formatted="false">In attesa del pagamento…</string>
+    <string name="terminal_qr_confirm" formatted="false">Conferma nell’app {m}</string>
+    <string name="terminal_qr_expired" formatted="false">Codice QR scaduto</string>
+    <string name="terminal_qr_new" formatted="false">Nuovo codice QR</string>
+    <string name="terminal_qr_alt" formatted="false">Codice QR per pagare con {m}. Tempo rimasto {t}.</string>
+    <string name="terminal_ok_title" formatted="false">Pagamento approvato</string>
+    <string name="terminal_ok_contactless" formatted="false">Contactless</string>
+    <string name="terminal_ok_chip" formatted="false">Chip</string>
+    <string name="terminal_ok_qr" formatted="false">Codice QR</string>
+    <string name="terminal_ok_back_in" formatted="false">Si torna all’inizio tra {s} s</string>
+    <string name="terminal_fail_declined" formatted="false">Carta rifiutata</string>
+    <string name="terminal_fail_declined_do" formatted="false">Prova un’altra carta o chiedi alla cassa un altro modo di pagare.</string>
+    <string name="terminal_fail_canceled" formatted="false">Pagamento annullato</string>
+    <string name="terminal_fail_canceled_do" formatted="false">Non è stato addebitato nulla.</string>
+    <string name="terminal_fail_timeout" formatted="false">Tempo scaduto per il pagamento</string>
+    <string name="terminal_fail_timeout_do" formatted="false">Non è stato addebitato nulla. Chiedi alla cassa di ricominciare.</string>
+    <string name="terminal_fail_read" formatted="false">Carta non leggibile</string>
+    <string name="terminal_fail_read_do" formatted="false">Riprova o usa un’altra carta.</string>
+    <string name="terminal_canceled_till" formatted="false">Annullato dalla cassa</string>
+    <string name="terminal_canceled_till_do" formatted="false">Non è stato addebitato nulla.</string>
+    <string name="terminal_pin_title" formatted="false">PIN del personale</string>
+    <string name="terminal_pin_enter" formatted="false">Inserisci il PIN di 6 cifre</string>
+    <string name="terminal_pin_wrong" formatted="false">PIN errato. Restano {n} tentativi.</string>
+    <string name="terminal_pin_locked" formatted="false">Troppi tentativi</string>
+    <string name="terminal_pin_locked_text" formatted="false">Riprova tra {t}.</string>
+    <string name="terminal_pin_digits" formatted="false">{n} cifre su 6 inserite</string>
+    <string name="terminal_pin_delete" formatted="false">Cancella</string>
+    <string name="terminal_menu_title" formatted="false">Menu del personale</string>
+    <string name="terminal_menu_close" formatted="false">Chiudi il menu</string>
+    <string name="terminal_i_store" formatted="false">Negozio</string>
+    <string name="terminal_i_name" formatted="false">Nome</string>
+    <string name="terminal_i_id" formatted="false">ID terminale</string>
+    <string name="terminal_i_psp" formatted="false">PSP</string>
+    <string name="terminal_i_app" formatted="false">Versione dell’app</string>
+    <string name="terminal_i_status" formatted="false">Stato</string>
+    <string name="terminal_i_contact" formatted="false">Ultimo contatto</string>
+    <string name="terminal_i_contact_v" formatted="false">12 s fa</string>
+    <string name="terminal_menu_setup" formatted="false">Rifai la configurazione</string>
+    <string name="terminal_menu_refresh" formatted="false">Aggiorna lo schermo a riposo</string>
+    <string name="terminal_menu_unpair" formatted="false">Scollega il terminale</string>
+    <string name="terminal_menu_exit" formatted="false">Esci dall’app</string>
+    <string name="terminal_c_unpair_t" formatted="false">Scollegare questo terminale?</string>
+    <string name="terminal_c_unpair_x" formatted="false">Non riceverà più pagamenti e servirà un nuovo codice di abbinamento.</string>
+    <string name="terminal_c_unpair_ok" formatted="false">Scollega</string>
+    <string name="terminal_c_exit_t" formatted="false">Uscire dall’app?</string>
+    <string name="terminal_c_exit_x" formatted="false">La cassa non raggiungerà questo terminale finché l’app non sarà riaperta.</string>
+    <string name="terminal_c_exit_ok" formatted="false">Esci dall’app</string>
+    <string name="terminal_c_setup_t" formatted="false">Rifare la configurazione?</string>
+    <string name="terminal_c_setup_x" formatted="false">Sceglierai di nuovo negozio e nome. L’abbinamento resta.</string>
+    <string name="terminal_c_setup_ok" formatted="false">Rifai</string>
+    <string name="terminal_off_title" formatted="false">Questo terminale è stato disattivato</string>
+    <string name="terminal_off_text" formatted="false">È stato disattivato in halba. Abbinalo di nuovo per usarlo.</string>
+    <string name="terminal_off_btn" formatted="false">Abbina di nuovo</string>
+    <string name="terminal_nonet_title" formatted="false">Nessuna connessione</string>
+    <string name="terminal_nonet_text" formatted="false">La cassa non può inviare pagamenti a questo terminale in questo momento.</string>
+    <string name="terminal_nonet_try" formatted="false">Nuovo tentativo in corso…</string>
+    <string name="terminal_boot" formatted="false">Avvio di halba</string>
+</resources>

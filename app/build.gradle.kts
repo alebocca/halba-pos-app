@@ -49,4 +49,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.3")
+    // Video dello schermo a riposo: loop senza fotogramma nero (REPEAT_MODE_ALL), senza audio
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
 }

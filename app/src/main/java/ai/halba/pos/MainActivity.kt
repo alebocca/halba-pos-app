@@ -1100,7 +1100,13 @@ class MainActivity : AppCompatActivity() {
                 withTimeout(60_000) { reader.collect(p) }
                 collecting = false
                 processing(u, p)
-                val r = api.result(id, "confirmed")
+                var r = api.result(id, "confirmed")
+                // Esito non ancora arrivato dal PSP (Adyen: la notifica di Adyen a halba): si rilegge per un minuto
+                val until = System.currentTimeMillis() + 60_000
+                while (r.optString("status") == "processing" && System.currentTimeMillis() < until) {
+                    delay(2000)
+                    r = runCatching { api.payment(id) }.getOrDefault(r)
+                }
                 watch.cancel()
                 if (r.optString("status") == "succeeded") result(p, "ok", null, test, r.optJSONObject("card"))
                 else result(p, "fail", reason("${r.optJSONObject("failure")?.optString("code")} ${r.optJSONObject("failure")?.optString("message")}"), test)
@@ -1124,7 +1130,7 @@ class MainActivity : AppCompatActivity() {
         return when {
             "cancel" in t -> "canceled"
             "timeout" in t || "timed out" in t || "expired" in t -> "timeout"
-            "declin" in t || "insufficient" in t || "do_not_honor" in t -> "declined"
+            "declin" in t || "refus" in t || "insufficient" in t || "do_not_honor" in t -> "declined"
             else -> "read"
         }
     }

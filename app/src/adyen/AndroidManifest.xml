@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Terminali Adyen: la Customer Area accetta solo i permessi della sua lista (INTERNET, ACCESS_NETWORK_STATE…).
+     Si tolgono il permesso aggiunto da androidx.core (l'app registra i ricevitori senza ContextCompat) e il
+     ricevitore di profileinstaller (protetto da android.permission.DUMP, inutile senza Play Store). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+    <uses-permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+    <application>
+        <receiver android:name="androidx.profileinstaller.ProfileInstallReceiver" tools:node="remove" />
+    </application>
+</manifest>

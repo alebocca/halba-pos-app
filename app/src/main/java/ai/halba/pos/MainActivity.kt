@@ -134,6 +134,7 @@ class MainActivity : AppCompatActivity() {
             systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         reader = Psp.cardReader(api, lifecycleScope)
+        api.readerStatus = { reader.diagnostics }
         secure = SecureStore(this)
         screen = ScreenCache(this, api)
         api.charging = { isCharging() }
@@ -243,6 +244,7 @@ class MainActivity : AppCompatActivity() {
             apply(api.config())
             online = true
             runCatching { reader.init(this@MainActivity); if (!reader.connected) readerInfo = withTimeout(15_000) { reader.connect() } }
+                .onFailure { readerInfo = "Card reader: ${it.message ?: it.javaClass.simpleName}" }
             runCatching { screen.sync(config?.optJSONObject("screen")) }
             loadLogo()
             waitForCommands()
@@ -1065,7 +1067,7 @@ class MainActivity : AppCompatActivity() {
     private fun cancelByCustomer(p: JSONObject, vararg jobs: Job?) {
         jobs.forEach { it?.cancel() }
         collecting = false
-        lifecycleScope.launch { runCatching { api.result(p.getString("id"), "canceled", "canceled", "Canceled on the terminal") } }
+        lifecycleScope.launch { runCatching { api.result(p.getString("id"), "canceled", "canceled", listOfNotNull("Canceled on the terminal", reader.diagnostics).joinToString(" · ")) } }
         result(p, "fail", "canceled")
     }
 
@@ -1086,6 +1088,11 @@ class MainActivity : AppCompatActivity() {
         u.add(pg.body, CardArt(this, u.p, u.accent.accent), top = 24f, width = Halba.px(this, 200f), height = Halba.px(this, 128f))
         u.add(pg.body, u.text(s(R.string.terminal_card_tap), Type.TITLE).apply { textSize = 30f }, top = 24f)
         u.add(pg.body, waitingRow(u, s(R.string.terminal_card_open)), top = 16f, width = -2)
+        // Ambiente di test: passo del lettore sotto l'attesa, per capire dove si ferma (sul terminale non ci sono log)
+        if (config?.optString("environment") == "test") {
+            val diag = u.add(pg.body, u.text("", Type.CAPTION), top = 12f)
+            lifecycleScope.launch { repeat(400) { (diag as? android.widget.TextView)?.text = reader.diagnostics.orEmpty(); delay(500) } }
+        }
         var job: Job? = null
         var watch: Job? = null
         pg.bottom.addView(u.textButton(s(R.string.terminal_cancel)) { cancelByCustomer(p, job, watch) })

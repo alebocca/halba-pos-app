@@ -13,6 +13,8 @@ class HalbaApi(private val base: String) {
     var deviceKey: String? = null
     // Il terminale dice a halba se è in carica (la dashboard avvisa il merchant quando non lo è)
     var charging: () -> Boolean? = { null }
+    // Stato del lettore di carte (diagnosi a distanza: sui terminali non si leggono i log)
+    var readerStatus: () -> String? = { null }
 
     // body: l'errore dell'API (per il PIN: attempts_left, locked_seconds)
     class ApiError(val status: Int, message: String, val body: JSONObject = JSONObject()) : Exception(message)
@@ -30,6 +32,7 @@ class HalbaApi(private val base: String) {
             val key = deviceKey
             if (id != null && key != null) conn.setRequestProperty("Authorization", "Device $id.$key")
             charging()?.let { conn.setRequestProperty("X-Charging", it.toString()) }
+            readerStatus()?.let { conn.setRequestProperty("X-Reader-Status", it.replace(Regex("[^\\x20-\\x7E]"), "?").take(300)) }
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (body != null) {
                 conn.doOutput = true

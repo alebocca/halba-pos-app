@@ -29,6 +29,11 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
     private var environment = "test"
     private var poiid: String? = null
 
+    // Passo corrente, per la diagnosi a distanza (halba lo riceve con ogni chiamata, X-Reader-Status)
+    @Volatile private var step: String = "not connected"
+    override val diagnostics: String get() = "adyen ${BuildConfig.VERSION_NAME}: $step"
+    private fun step(s: String) { step = s.take(240) }
+
     override val label = "Adyen"
     override val permissions = emptyList<String>()
     override val connected: Boolean get() = crypto != null && poiid != null
@@ -37,10 +42,25 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
 
     // POIID dal terminale (Adyen: Settings.Global DEVICE_NAME, per esempio S1F2-000158262320202) e chiave da halba
     override suspend fun connect(): String {
-        poiid = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)?.takeIf { POIID.matches(it) }
-            ?: throw IllegalStateException("This is not an Adyen payment terminal")
-        loadKey()
-        return "Adyen $poiid · payment app"
+        val name = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+        poiid = name?.takeIf { POIID.matches(it) } ?: run { step("no POIID (DEVICE_NAME=$name)"); throw IllegalStateException("This is not an Adyen payment terminal") }
+        try { loadKey() } catch (e: Exception) { step("key: ${e.message}"); throw e }
+        // Controllo rapido dell'app di pagamento: DiagnosisRequest sulla Terminal API locale
+        step("diagnosis: sending")
+        val ok = try {
+            val r = kotlinx.coroutines.withTimeout(12_000) {
+                send(JSONObject().put("SaleToPOIRequest", JSONObject()
+                    .put("MessageHeader", header("Diagnosis", serviceId(), "halba-diagnosis"))
+                    .put("DiagnosisRequest", JSONObject().put("HostDiagnosisFlag", false))), 10_000)
+            }
+            val res = r.optJSONObject("SaleToPOIResponse")?.optJSONObject("DiagnosisResponse")?.optJSONObject("Response")
+            step(if (res == null) "diagnosis: unexpected ${r.toString().take(80)}" else "diagnosis: ${res.optString("Result")} ${res.optString("ErrorCondition")}".trim())
+            res?.optString("Result") == "Success"
+        } catch (e: Exception) {
+            step("diagnosis error: ${describe(e)}")
+            false
+        }
+        return "Adyen $poiid · payment app ${if (ok) "ready" else "not reachable"}"
     }
 
     private suspend fun loadKey() {
@@ -60,15 +80,23 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         if (crypto == null || poiid == null) connect()
         val header = header("Payment", a.getString("service_id"), a.getString("sale_id"))
         val request = JSONObject().put("SaleToPOIRequest", JSONObject().put("MessageHeader", header).put("PaymentRequest", a.getJSONObject("payment_request")))
+        step("payment: sending")
         val response = try {
-            send(request, 170_000)
+            send(request, 170_000).also { step("payment: response received") }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // Annullato dalla cassa, dal cliente o per tempo scaduto: si ferma anche l'app di pagamento
-            withContext(NonCancellable) { runCatching { abort(a) } }
+            val at = step
+            withContext(NonCancellable) {
+                runCatching { abort(a) }.onSuccess { step("$at · canceled, abort sent") }.onFailure { step("$at · canceled, abort error: ${describe(it)}") }
+            }
+            throw e
+        } catch (e: Exception) {
+            step("payment error: ${describe(e)}")
             throw e
         }
         val pr = response.optJSONObject("SaleToPOIResponse")?.optJSONObject("PaymentResponse") ?: throw IllegalStateException("No payment response from the terminal")
         val res = pr.optJSONObject("Response") ?: JSONObject()
+        step("payment result: ${res.optString("Result")} ${res.optString("ErrorCondition")}".trim())
         when (res.optString("Result")) {
             "Success", "Partial" -> return
             else -> {
@@ -112,9 +140,15 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         conn.readTimeout = timeoutMs
         conn.doOutput = true
         conn.setRequestProperty("Content-Type", "application/json")
+        val what = step.substringBefore(":")
         try {
+            step("$what: connecting to $ENDPOINT")
+            conn.connect()
+            step("$what: connected (TLS ok), sending")
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            step("$what: sent, waiting for the payment app")
             val status = conn.responseCode
+            step("$what: HTTP $status")
             status to ((if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: "")
         } finally {
             conn.disconnect()
@@ -144,6 +178,7 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         const val ENDPOINT = "https://localhost:8443/nexo"
         private val POIID = Regex("^[A-Za-z0-9]{3,}-[A-Za-z0-9]{6,}$")
         private val CN = Regex("(?:^|,)CN=([^,]+)")
+        private fun describe(e: Throwable): String = generateSequence(e) { it.cause }.take(3).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(80)}" }
         private fun serviceId() = UUID.randomUUID().toString().replace("-", "").take(10).uppercase()
 
         // AdditionalResponse: coppie chiave=valore come in un form, oppure JSON in Base64

@@ -11,8 +11,8 @@ android {
         applicationId = "ai.halba.pos"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
         // Sandbox di halba: in produzione https://api.halba.ai
         buildConfigField("String", "HALBA_API", "\"https://api.sandbox.halba.ai\"")
     }

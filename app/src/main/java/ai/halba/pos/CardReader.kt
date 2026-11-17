@@ -15,4 +15,6 @@ interface CardReader {
     fun canPayByCard(payment: JSONObject): Boolean
     val cardHint: String //                   riga sotto l'importo mentre si aspetta la carta
     suspend fun collect(payment: JSONObject) //  carta letta e confermata presso il PSP; eccezione se non va
+    // Ultimo passo del lettore (collegamento, invio, risposta, errore), mandato a halba per la diagnosi a distanza
+    val diagnostics: String? get() = null
 }

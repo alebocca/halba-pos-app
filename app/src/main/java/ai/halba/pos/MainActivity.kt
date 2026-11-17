@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity() {
         try {
             apply(api.config())
             online = true
-            runCatching { reader.init(this@MainActivity); if (!reader.connected) readerInfo = withTimeout(15_000) { reader.connect() } }
+            runCatching { reader.init(this@MainActivity); if (!reader.connected) readerInfo = withTimeout(60_000) { reader.connect() } }
                 .onFailure { readerInfo = "Card reader: ${it.message ?: it.javaClass.simpleName}" }
             runCatching { screen.sync(config?.optJSONObject("screen")) }
             loadLogo()
@@ -496,7 +496,7 @@ class MainActivity : AppCompatActivity() {
         show(pg.root)
         try {
             reader.init(this@MainActivity)
-            if (!reader.connected) readerInfo = withTimeout(15_000) { reader.connect() }
+            if (!reader.connected) readerInfo = withTimeout(60_000) { reader.connect() }
             val ok = setupPage(4, s(R.string.terminal_reader_title), onBack = back)
             u.add(ok.body, u.badge("success"), top = 48f)
             u.add(ok.body, u.text(s(R.string.terminal_reader_ready), Type.HEADLINE), top = 16f).also { announce(it, s(R.string.terminal_reader_ready), false) }

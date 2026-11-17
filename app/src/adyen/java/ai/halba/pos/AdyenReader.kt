@@ -50,7 +50,16 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         val name = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
         poiid = name?.takeIf { POIID.matches(it) } ?: run { step("no POIID (DEVICE_NAME=$name)"); throw IllegalStateException("This is not an Adyen payment terminal") }
         try { loadKey() } catch (e: Exception) { step("key: ${e.message}"); throw e }
-        probe = withContext(Dispatchers.IO) { probeLocal() }
+        withContext(Dispatchers.IO) {
+            val diag = JSONObject().put("SaleToPOIRequest", JSONObject()
+                .put("MessageHeader", header("Diagnosis", serviceId(), "halba-diagnosis"))
+                .put("DiagnosisRequest", JSONObject().put("HostDiagnosisFlag", false)))
+            // Si scrive man mano: anche se l'avvio va in timeout resta quello che si è saputo
+            probe = probeLocal()
+            probe += " | get " + rawHttp("GET", "/nexo", null)
+            probe += " | plain " + rawHttp("POST", "/nexo", diag.toString())
+            probe += " | enc " + rawHttp("POST", "/nexo", crypto!!.encrypt(diag).toString())
+        }
         // Controllo rapido dell'app di pagamento: DiagnosisRequest sulla Terminal API locale
         step("diagnosis: sending")
         val ok = try {
@@ -185,7 +194,7 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
             val ssl = tls().socketFactory.createSocket(socket, HOST, 8443, true) as javax.net.ssl.SSLSocket
             ssl.startHandshake()
             val cert = ssl.session.peerCertificates.firstOrNull() as? X509Certificate
-            out += "tls ${ssl.session.protocol} CN=${cert?.let { CN.find(it.subjectX500Principal.name)?.groupValues?.get(1) } ?: "?"} name ${if (verifier().verify(HOST, ssl.session)) "ok" else "rejected"}"
+            out += "tls ${ssl.session.protocol} ${if (verifier().verify(HOST, ssl.session)) "cert ok" else "cert rejected"}"
             ssl.close()
         } catch (e: Throwable) {
             out += describe(e)
@@ -193,6 +202,33 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
             runCatching { socket.close() }
         }
         return out.joinToString(", ")
+    }
+
+    // Richiesta HTTP/1.1 scritta a mano sul socket TLS: prima riga della risposta e inizio del corpo, o l'errore
+    private fun rawHttp(method: String, path: String, body: String?): String {
+        val started = System.currentTimeMillis()
+        return try {
+            val ssl = tls().socketFactory.createSocket() as javax.net.ssl.SSLSocket
+            ssl.use {
+                it.connect(java.net.InetSocketAddress(HOST, 8443), 3_000)
+                it.soTimeout = 5_000
+                it.startHandshake()
+                val bytes = body?.toByteArray(Charsets.UTF_8) ?: ByteArray(0)
+                val head = buildString {
+                    append("$method $path HTTP/1.1\r\nHost: $HOST:8443\r\nConnection: close\r\nAccept: application/json\r\n")
+                    if (body != null) append("Content-Type: application/json\r\nContent-Length: ${bytes.size}\r\n")
+                    append("\r\n")
+                }
+                it.outputStream.write(head.toByteArray(Charsets.US_ASCII) + bytes)
+                it.outputStream.flush()
+                val text = it.inputStream.bufferedReader().readText()
+                val status = text.lineSequence().firstOrNull().orEmpty().removePrefix("HTTP/1.1 ")
+                val payload = text.substringAfter("\r\n\r\n", "").replace(Regex("\\s+"), " ").take(40)
+                "$status ${payload}".trim() + " ${System.currentTimeMillis() - started}ms"
+            }
+        } catch (e: Throwable) {
+            "${e.javaClass.simpleName} ${System.currentTimeMillis() - started}ms"
+        }
     }
 
     // Solo i certificati firmati dalla radice Adyen del terminale (test o live, come l'ambiente halba)

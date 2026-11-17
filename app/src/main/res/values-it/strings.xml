@@ -115,4 +115,6 @@
     <string name="terminal_nonet_text" formatted="false">La cassa non può inviare pagamenti a questo terminale in questo momento.</string>
     <string name="terminal_nonet_try" formatted="false">Nuovo tentativo in corso…</string>
     <string name="terminal_boot" formatted="false">Avvio di halba</string>
+    <string name="terminal_pending_title" formatted="false">Esito in verifica</string>
+    <string name="terminal_pending_do" formatted="false">La carta è stata letta. Non ripetere il pagamento: l\'esito comparirà a breve sulla cassa.</string>
 </resources>

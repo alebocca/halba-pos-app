@@ -115,4 +115,6 @@
     <string name="terminal_nonet_text" formatted="false">The till cannot send payments to this terminal right now.</string>
     <string name="terminal_nonet_try" formatted="false">Trying again…</string>
     <string name="terminal_boot" formatted="false">Starting halba</string>
+    <string name="terminal_pending_title" formatted="false">Confirming the payment</string>
+    <string name="terminal_pending_do" formatted="false">The card was read. Don\'t pay again: the outcome will appear on the till shortly.</string>
 </resources>

@@ -129,10 +129,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(container)
         // Terminale da banco in kiosk: niente barre di sistema (riappaiono con uno scorrimento dal bordo e si richiudono)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
-        androidx.core.view.WindowInsetsControllerCompat(window, container).apply {
-            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        hideSystemBars()
         reader = Psp.cardReader(api, lifecycleScope)
         api.readerStatus = { reader.diagnostics }
         secure = SecureStore(this)
@@ -159,7 +156,23 @@ class MainActivity : AppCompatActivity() {
     // Ritorno dall'app del PSP (handoff della carta): "Elaborazione in corso"
     override fun onResume() {
         super.onResume()
+        hideSystemBars()
         if (collecting) onReturn?.invoke()
+    }
+
+    // L'app di pagamento del PSP (Adyen, Stripe) mostra le sue schermate sopra la nostra e al ritorno lascia visibili
+    // orologio e barra di stato: appena la finestra torna in primo piano si richiudono
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    // Terminale da banco in kiosk: niente barre di sistema (riappaiono con uno scorrimento dal bordo e si richiudono)
+    private fun hideSystemBars() {
+        androidx.core.view.WindowInsetsControllerCompat(window, container).apply {
+            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     // Ogni tocco rinvia il ritorno a riposo per inattività
@@ -1116,6 +1129,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 watch.cancel()
                 if (r.optString("status") == "succeeded") result(p, "ok", null, test, r.optJSONObject("card"))
+                // Carta passata ma conferma del PSP non ancora arrivata a halba: niente errore, la cassa vedrà l'esito
+                else if (r.optString("status") == "processing") result(p, "pending", null, test)
                 else result(p, "fail", reason("${r.optJSONObject("failure")?.optString("code")} ${r.optJSONObject("failure")?.optString("message")}"), test)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 collecting = false; watch.cancel()
@@ -1256,6 +1271,12 @@ class MainActivity : AppCompatActivity() {
                     }, top = 16f, width = -2)
                 }
                 spoken = listOfNotNull(title, amountOf(p), what).joinToString(", ")
+            }
+            "pending" -> {
+                u.add(pg.body, u.badge("neutral"))
+                u.add(pg.body, u.text(s(R.string.terminal_pending_title), Type.TITLE), top = 24f)
+                u.add(pg.body, u.text(s(R.string.terminal_pending_do), Type.TEXT), top = 8f)
+                spoken = "${s(R.string.terminal_pending_title)}. ${s(R.string.terminal_pending_do)}"
             }
             "till" -> {
                 u.add(pg.body, u.badge("neutral"))

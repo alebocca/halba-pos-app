@@ -115,4 +115,6 @@
     <string name="terminal_nonet_text" formatted="false">Die Kasse kann derzeit keine Zahlungen an dieses Terminal senden.</string>
     <string name="terminal_nonet_try" formatted="false">Neuer Versuch läuft…</string>
     <string name="terminal_boot" formatted="false">halba wird gestartet</string>
+    <string name="terminal_pending_title" formatted="false">Zahlung wird bestätigt</string>
+    <string name="terminal_pending_do" formatted="false">Die Karte wurde gelesen. Bitte nicht erneut zahlen: das Ergebnis erscheint gleich an der Kasse.</string>
 </resources>

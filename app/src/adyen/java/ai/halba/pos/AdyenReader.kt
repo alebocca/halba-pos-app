@@ -4,7 +4,11 @@ import android.content.Context
 import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.thread
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import org.json.JSONObject
 import java.net.URL
 import java.security.KeyStore
@@ -31,7 +35,8 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
 
     // Passo corrente, per la diagnosi a distanza (halba lo riceve con ogni chiamata, X-Reader-Status)
     @Volatile private var step: String = "not connected"
-    override val diagnostics: String get() = "adyen ${BuildConfig.VERSION_NAME}: $step"
+    @Volatile private var probe: String = ""
+    override val diagnostics: String get() = "adyen ${BuildConfig.VERSION_NAME}: ${if (probe.isEmpty()) "" else "[$probe] "}$step"
     private fun step(s: String) { step = s.take(240) }
 
     override val label = "Adyen"
@@ -45,6 +50,7 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         val name = Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
         poiid = name?.takeIf { POIID.matches(it) } ?: run { step("no POIID (DEVICE_NAME=$name)"); throw IllegalStateException("This is not an Adyen payment terminal") }
         try { loadKey() } catch (e: Exception) { step("key: ${e.message}"); throw e }
+        probe = withContext(Dispatchers.IO) { probeLocal() }
         // Controllo rapido dell'app di pagamento: DiagnosisRequest sulla Terminal API locale
         step("diagnosis: sending")
         val ok = try {
@@ -131,28 +137,62 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         return if (body.has("NexoBlob")) c.decrypt(json) else json
     }
 
-    private suspend fun post(body: String, timeoutMs: Int): Pair<Int, String> = withContext(Dispatchers.IO) {
+    // Chiamata bloccante su un thread suo: se la coroutine viene annullata (cassa, cliente, tempo scaduto) si chiude la
+    // connessione, così l'attesa finisce subito e parte l'AbortRequest
+    private suspend fun post(body: String, timeoutMs: Int): Pair<Int, String> = suspendCancellableCoroutine { cont ->
+        val bytes = body.toByteArray(Charsets.UTF_8)
         val conn = URL(ENDPOINT).openConnection() as HttpsURLConnection
-        conn.sslSocketFactory = tls().socketFactory
-        conn.hostnameVerifier = verifier()
-        conn.requestMethod = "POST"
-        conn.connectTimeout = 5_000
-        conn.readTimeout = timeoutMs
-        conn.doOutput = true
-        conn.setRequestProperty("Content-Type", "application/json")
+        cont.invokeOnCancellation { runCatching { conn.disconnect() } }
         val what = step.substringBefore(":")
-        try {
-            step("$what: connecting to $ENDPOINT")
-            conn.connect()
-            step("$what: connected (TLS ok), sending")
-            conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            step("$what: sent, waiting for the payment app")
-            val status = conn.responseCode
-            step("$what: HTTP $status")
-            status to ((if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: "")
-        } finally {
-            conn.disconnect()
+        thread(name = "adyen-local", isDaemon = true) {
+            try {
+                conn.sslSocketFactory = tls().socketFactory
+                conn.hostnameVerifier = verifier()
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 5_000
+                conn.readTimeout = timeoutMs
+                conn.doOutput = true
+                // Lunghezza fissa (Content-Length), niente chunked: come le librerie di Adyen
+                conn.setFixedLengthStreamingMode(bytes.size)
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.setRequestProperty("Accept", "application/json")
+                step("$what: connecting to $ENDPOINT")
+                conn.connect()
+                step("$what: connected (TLS ok), sending ${bytes.size} bytes")
+                conn.outputStream.use { it.write(bytes) }
+                step("$what: sent, waiting for the payment app")
+                val status = conn.responseCode
+                step("$what: HTTP $status")
+                val text = (if (status < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                if (cont.isActive) cont.resume(status to text)
+            } catch (e: Throwable) {
+                if (cont.isActive) { step("$step -> ${describe(e)}"); cont.resumeWithException(e) }
+            } finally {
+                runCatching { conn.disconnect() }
+            }
         }
+    }
+
+    // TCP e poi TLS verso l'app di pagamento, separati e con tempi brevi: dice se la porta risponde, se l'handshake si
+    // chiude e chi presenta il certificato
+    private fun probeLocal(): String {
+        val out = mutableListOf<String>()
+        val socket = java.net.Socket()
+        try {
+            socket.connect(java.net.InetSocketAddress(HOST, 8443), 3_000)
+            out += "tcp ok"
+            socket.soTimeout = 6_000
+            val ssl = tls().socketFactory.createSocket(socket, HOST, 8443, true) as javax.net.ssl.SSLSocket
+            ssl.startHandshake()
+            val cert = ssl.session.peerCertificates.firstOrNull() as? X509Certificate
+            out += "tls ${ssl.session.protocol} CN=${cert?.let { CN.find(it.subjectX500Principal.name)?.groupValues?.get(1) } ?: "?"} name ${if (verifier().verify(HOST, ssl.session)) "ok" else "rejected"}"
+            ssl.close()
+        } catch (e: Throwable) {
+            out += describe(e)
+        } finally {
+            runCatching { socket.close() }
+        }
+        return out.joinToString(", ")
     }
 
     // Solo i certificati firmati dalla radice Adyen del terminale (test o live, come l'ambiente halba)
@@ -175,7 +215,9 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
     }
 
     companion object {
-        const val ENDPOINT = "https://localhost:8443/nexo"
+        // 127.0.0.1 e non localhost: "localhost" può risolversi prima in ::1, dove l'app di pagamento può non ascoltare
+        const val HOST = "127.0.0.1"
+        const val ENDPOINT = "https://$HOST:8443/nexo"
         private val POIID = Regex("^[A-Za-z0-9]{3,}-[A-Za-z0-9]{6,}$")
         private val CN = Regex("(?:^|,)CN=([^,]+)")
         private fun describe(e: Throwable): String = generateSequence(e) { it.cause }.take(3).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(80)}" }

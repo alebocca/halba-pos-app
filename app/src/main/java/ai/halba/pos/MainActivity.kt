@@ -1022,7 +1022,7 @@ class MainActivity : AppCompatActivity() {
         if (amountLabel) u.add(pg.body, u.text(s(R.string.terminal_card_amount_lbl), Type.LABEL, u.p.muted), top = 4f)
         // Schermata del QR: marchio del metodo (se c'è il file) con il nome
         if (method != null) {
-            methodMark(method)?.let { b -> u.add(pg.body, ImageView(this).apply { setImageBitmap(b); adjustViewBounds = true; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, top = 8f, width = -2, height = Halba.px(this, 40f)) }
+            markTile(method)?.let { t -> u.add(pg.body, t, top = 8f, width = Halba.px(this, 112f), height = Halba.px(this, 48f)) }
             u.add(pg.body, u.text(labels[method] ?: method, Type.HEADLINE), top = 4f)
         }
         u.add(pg.body, u.amount(amountOf(p)), top = 4f)
@@ -1069,8 +1069,8 @@ class MainActivity : AppCompatActivity() {
                     background = Halba.rounded(this@MainActivity, u.p.surface, Halba.R_TILE, u.p.borderStrong)
                     // Design system (terminal.md, scelta del metodo): marchio ufficiale alto 40 dp sul suo fondo
                     // consentito; finché il file del marchio non c'è, il nome con la grafia ufficiale
-                    val mark = methodMark(m)
-                    if (mark != null) addView(ImageView(this@MainActivity).apply { setImageBitmap(mark); adjustViewBounds = true; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(-2, Halba.px(this@MainActivity, 40f)))
+                    val mark = markTile(m)
+                    if (mark != null) addView(mark, LinearLayout.LayoutParams(Halba.px(this@MainActivity, 112f), Halba.px(this@MainActivity, 48f)))
                     else addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink))
                     isClickable = true
                     contentDescription = labels[m] ?: m
@@ -1184,6 +1184,22 @@ class MainActivity : AppCompatActivity() {
     private val marks = mutableMapOf<String, android.graphics.Bitmap?>()
     private fun methodMark(m: String): android.graphics.Bitmap? = marks.getOrPut(m) {
         runCatching { assets.open("marks/$m.png").use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+    }
+
+    // Riquadro del marchio (design system, checkout/methods/methods.json): 112 × 48 dp senza cornice propria, immagine
+    // dentro 96 × 32, colore del riquadro per metodo (nero TWINT, rosa Klarna, giallo iDEAL | Wero, bianco gli altri)
+    private val tileColour = mapOf("twint" to 0xFF000000.toInt(), "klarna" to 0xFFFFA8CD.toInt(), "klarna_paynow" to 0xFFFFA8CD.toInt(), "klarna_account" to 0xFFFFA8CD.toInt(), "ideal" to 0xFFFFF48D.toInt())
+    private fun markTile(m: String): View? {
+        val bmp = methodMark(m) ?: return null
+        return FrameLayout(this).apply {
+            background = Halba.rounded(this@MainActivity, tileColour[m] ?: Color.WHITE, 8f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(ImageView(this@MainActivity).apply {
+                setImageBitmap(bmp)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, FrameLayout.LayoutParams(Halba.px(this@MainActivity, 96f), Halba.px(this@MainActivity, 32f), Gravity.CENTER))
+        }
     }
 
     // --- E. QR: 288 dp, nero su bianco, margine bianco di 20 dp; 15 minuti; luminosità al massimo ---

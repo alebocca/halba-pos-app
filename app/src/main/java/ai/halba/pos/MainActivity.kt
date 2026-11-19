@@ -87,7 +87,13 @@ class MainActivity : AppCompatActivity() {
     private var statusPill: View? = null
     private var powerPill: View? = null
 
-    private val labels = mapOf("card" to "Card", "alipay" to "Alipay", "wechatpay" to "WeChat Pay", "bizum" to "Bizum", "blik" to "BLIK", "twint" to "TWINT")
+    // Nomi ufficiali dei metodi (stessa grafia della pagina di pagamento di halba)
+    private val labels = mapOf(
+        "card" to "Card", "alipay" to "Alipay", "wechatpay" to "WeChat Pay", "bizum" to "Bizum", "blik" to "BLIK", "twint" to "TWINT",
+        "paypal" to "PayPal", "klarna" to "Klarna", "klarna_paynow" to "Klarna Pay Now", "klarna_account" to "Klarna Pay Over Time",
+        "clearpay" to "Clearpay", "ideal" to "iDEAL | Wero", "eps" to "EPS", "trustly" to "Trustly", "mbway" to "MB WAY",
+        "scalapay" to "Scalapay", "apple_pay" to "Apple Pay", "google_pay" to "Google Pay",
+    )
     // Istruzione del QR nella lingua del metodo (8.3)
     private val localLine = mapOf("alipay" to "请使用支付宝扫码", "wechatpay" to "请使用微信扫码", "bizum" to "Escanea con Bizum", "blik" to "Zeskanuj w aplikacji banku")
 
@@ -1014,7 +1020,11 @@ class MainActivity : AppCompatActivity() {
         val ref = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" && it != "halba-setup-test" }
         if (ref != null) u.add(pg.body, u.text(s(R.string.terminal_ref, "r" to ref), Type.LABEL, u.p.muted))
         if (amountLabel) u.add(pg.body, u.text(s(R.string.terminal_card_amount_lbl), Type.LABEL, u.p.muted), top = 4f)
-        if (method != null) u.add(pg.body, u.text(labels[method] ?: method, Type.HEADLINE), top = 4f)
+        // Schermata del QR: marchio del metodo (se c'è il file) con il nome
+        if (method != null) {
+            methodMark(method)?.let { b -> u.add(pg.body, ImageView(this).apply { setImageBitmap(b); adjustViewBounds = true; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, top = 8f, width = -2, height = Halba.px(this, 40f)) }
+            u.add(pg.body, u.text(labels[method] ?: method, Type.HEADLINE), top = 4f)
+        }
         u.add(pg.body, u.amount(amountOf(p)), top = 4f)
     }
 
@@ -1057,8 +1067,11 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
                     background = Halba.rounded(this@MainActivity, u.p.surface, Halba.R_TILE, u.p.borderStrong)
-                    addView(Icon(this@MainActivity, "qr", u.p.ink), LinearLayout.LayoutParams(Halba.px(this@MainActivity, 28f), Halba.px(this@MainActivity, 28f)))
-                    addView(u.text(labels[m] ?: m, Type.LABEL, u.p.ink))
+                    // Design system (terminal.md, scelta del metodo): marchio ufficiale alto 40 dp sul suo fondo
+                    // consentito; finché il file del marchio non c'è, il nome con la grafia ufficiale
+                    val mark = methodMark(m)
+                    if (mark != null) addView(ImageView(this@MainActivity).apply { setImageBitmap(mark); adjustViewBounds = true; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(-2, Halba.px(this@MainActivity, 40f)))
+                    else addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink))
                     isClickable = true
                     contentDescription = labels[m] ?: m
                     setOnClickListener { payByQr(p, m) }
@@ -1165,6 +1178,12 @@ class MainActivity : AppCompatActivity() {
         u.add(pg.body, u.text(s(R.string.terminal_processing_sub), Type.TEXT), top = 8f)
         show(pg.root)
         announce(pg.body, s(R.string.terminal_processing), assertive = false)
+    }
+
+    // Marchi ufficiali dei metodi: asset marks/<metodo>.png (forniti dai circuiti, dal design system di halba)
+    private val marks = mutableMapOf<String, android.graphics.Bitmap?>()
+    private fun methodMark(m: String): android.graphics.Bitmap? = marks.getOrPut(m) {
+        runCatching { assets.open("marks/$m.png").use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
     }
 
     // --- E. QR: 288 dp, nero su bianco, margine bianco di 20 dp; 15 minuti; luminosità al massimo ---

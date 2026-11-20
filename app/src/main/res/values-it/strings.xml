@@ -127,4 +127,5 @@
     <string name="terminal_receipt_ref" formatted="false">Rif. halba</string>
     <string name="terminal_receipt_thanks" formatted="false">Grazie</string>
     <string name="terminal_choose_mode" formatted="false">Scegli come pagare</string>
+    <string name="terminal_native_follow" formatted="false">Inquadra il codice con {m} sul terminale</string>
 </resources>

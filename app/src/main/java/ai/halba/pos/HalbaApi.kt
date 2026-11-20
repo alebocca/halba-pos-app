@@ -60,6 +60,8 @@ class HalbaApi(private val base: String) {
         if (code != null || message != null) body.put("failure", JSONObject().put("code", code ?: status).put("message", message ?: ""))
         return call("POST", "/v1/devices/payments/$id/result", body)
     }
+    // QR gestito dall'app di pagamento del PSP (Alipay, WeChat Pay su Adyen): halba prepara la richiesta per quel metodo
+    suspend fun native(id: String, method: String): JSONObject = call("POST", "/v1/devices/payments/$id/native", JSONObject().put("method", method))
     suspend fun qr(id: String, method: String): JSONObject = call("POST", "/v1/devices/payments/$id/qr", JSONObject().put("method", method))
 
     // Configurazione: negozio, nome, PIN impostato, schermo a riposo (link temporaneo al file)

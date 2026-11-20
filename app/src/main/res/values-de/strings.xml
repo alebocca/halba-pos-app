@@ -127,4 +127,5 @@
     <string name="terminal_receipt_ref" formatted="false">halba-Ref.</string>
     <string name="terminal_receipt_thanks" formatted="false">Vielen Dank</string>
     <string name="terminal_choose_mode" formatted="false">Wählen Sie, wie Sie zahlen</string>
+    <string name="terminal_native_follow" formatted="false">Scannen Sie den Code mit {m} am Terminal</string>
 </resources>

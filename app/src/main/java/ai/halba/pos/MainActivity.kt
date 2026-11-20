@@ -1002,7 +1002,23 @@ class MainActivity : AppCompatActivity() {
         when (val m = p.optString("method").takeIf { it.isNotEmpty() && it != "null" }) {
             null -> choose(p)
             "card" -> if (reader.canPayByCard(p)) payByCard(p) else result(p, "fail", "read")
-            else -> payByQr(p, m)
+            else -> payByMethod(p, m)
+        }
+    }
+
+    // Metodo con QR: quelli dell'app di pagamento del PSP (Alipay, WeChat Pay su Adyen) vanno all'app di pagamento come
+    // la carta (il QR lo mostra il PSP); gli altri con la pagina di halba
+    private fun isNative(p: JSONObject, m: String): Boolean {
+        val n = p.optJSONArray("native") ?: return false
+        return (0 until n.length()).any { n.optString(it) == m }
+    }
+    private fun payByMethod(p: JSONObject, m: String) {
+        if (!isNative(p, m)) return payByQr(p, m)
+        // Richiesta già pronta (metodo scelto dalla cassa) o da chiedere a halba (scelto qui sul terminale)
+        if (p.optJSONObject("adyen") != null && p.optString("method") == m) return payByCard(p, native = m)
+        lifecycleScope.launch {
+            val np = try { api.native(p.getString("id"), m) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { result(p, "fail", "read"); return@launch }
+            payByCard(np, native = m)
         }
     }
 
@@ -1076,7 +1092,7 @@ class MainActivity : AppCompatActivity() {
                     isClickable = true
                     contentDescription = labels[m] ?: m
                     val modes = all.filter { it != "card" && familyOf(it) == m }
-                    setOnClickListener { if (modes.size > 1) chooseMode(p, m, modes) else payByQr(p, modes.firstOrNull() ?: m) }
+                    setOnClickListener { if (modes.size > 1) chooseMode(p, m, modes) else payByMethod(p, modes.firstOrNull() ?: m) }
                 }
                 grid.addView(tile, GridLayout.LayoutParams().apply {
                     width = if (full) usable else (usable - gap) / 2
@@ -1109,12 +1125,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     // --- D. Carta: "Avvicina, inserisci o striscia", passaggio al lettore del PSP, ritorno ed elaborazione ---
-    private fun payByCard(p: JSONObject, test: Boolean = false) {
+    private fun payByCard(p: JSONObject, test: Boolean = false, native: String? = null) {
         val u = light
         val pg = u.page()
         header(u, pg, p, amountLabel = true)
-        u.add(pg.body, CardArt(this, u.p, u.accent.accent), top = 24f, width = Halba.px(this, 200f), height = Halba.px(this, 128f))
-        u.add(pg.body, u.text(s(R.string.terminal_card_tap), Type.TITLE).apply { textSize = 30f }, top = 24f)
+        if (native != null) {
+            // Alipay, WeChat Pay: il QR lo mostra l'app di pagamento del PSP
+            markTile(native)?.let { u.add(pg.body, it, top = 24f, width = Halba.px(this, 112f), height = Halba.px(this, 48f)) }
+            u.add(pg.body, u.text(s(R.string.terminal_native_follow, "m" to (labels[native] ?: native)), Type.TITLE), top = 24f)
+        } else {
+            u.add(pg.body, CardArt(this, u.p, u.accent.accent), top = 24f, width = Halba.px(this, 200f), height = Halba.px(this, 128f))
+            u.add(pg.body, u.text(s(R.string.terminal_card_tap), Type.TITLE).apply { textSize = 30f }, top = 24f)
+        }
         u.add(pg.body, waitingRow(u, s(R.string.terminal_card_open)), top = 16f, width = -2)
         // Ambiente di test: passo del lettore sotto l'attesa, per capire dove si ferma (sul terminale non ci sono log)
         if (config?.optString("environment") == "test") {
@@ -1202,7 +1224,7 @@ class MainActivity : AppCompatActivity() {
                 addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink, center = false))
                 isClickable = true
                 contentDescription = labels[m] ?: m
-                setOnClickListener { payByQr(p, m) }
+                setOnClickListener { payByMethod(p, m) }
             }
             u.add(pg.body, row, top = 8f)
         }

@@ -126,4 +126,5 @@
     <string name="terminal_receipt_order" formatted="false">Order</string>
     <string name="terminal_receipt_ref" formatted="false">halba ref.</string>
     <string name="terminal_receipt_thanks" formatted="false">Thank you</string>
+    <string name="terminal_choose_mode" formatted="false">Choose how to pay</string>
 </resources>

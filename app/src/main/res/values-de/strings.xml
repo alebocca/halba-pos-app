@@ -126,4 +126,5 @@
     <string name="terminal_receipt_order" formatted="false">Bestellung</string>
     <string name="terminal_receipt_ref" formatted="false">halba-Ref.</string>
     <string name="terminal_receipt_thanks" formatted="false">Vielen Dank</string>
+    <string name="terminal_choose_mode" formatted="false">Wählen Sie, wie Sie zahlen</string>
 </resources>

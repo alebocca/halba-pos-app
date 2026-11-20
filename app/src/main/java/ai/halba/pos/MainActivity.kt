@@ -1054,7 +1054,8 @@ class MainActivity : AppCompatActivity() {
             }
             u.add(pg.body, tile, top = 24f)
         }
-        val qr = all.filter { it != "card" }
+        // Metodi con più modalità (Klarna, Klarna Pay Now, Klarna Pay Over Time): un solo riquadro con il marchio
+        val qr = all.filter { it != "card" }.map { familyOf(it) }.distinct()
         if (qr.isNotEmpty()) {
             u.add(pg.body, u.text(s(R.string.terminal_or_qr), Type.LABEL, u.p.muted, center = false), top = 24f, gravity = Gravity.START)
             // Metodi con QR su due colonne (8 dp), l'ultimo dispari a tutta larghezza; i marchi ufficiali sono da inserire
@@ -1074,7 +1075,8 @@ class MainActivity : AppCompatActivity() {
                     else addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink))
                     isClickable = true
                     contentDescription = labels[m] ?: m
-                    setOnClickListener { payByQr(p, m) }
+                    val modes = all.filter { it != "card" && familyOf(it) == m }
+                    setOnClickListener { if (modes.size > 1) chooseMode(p, m, modes) else payByQr(p, modes.firstOrNull() ?: m) }
                 }
                 grid.addView(tile, GridLayout.LayoutParams().apply {
                     width = if (full) usable else (usable - gap) / 2
@@ -1180,6 +1182,34 @@ class MainActivity : AppCompatActivity() {
         announce(pg.body, s(R.string.terminal_processing), assertive = false)
     }
 
+    // Famiglia del metodo: le modalità dello stesso marchio stanno sotto un solo riquadro
+    private fun familyOf(m: String) = if (m.startsWith("klarna")) "klarna" else m
+
+    // Scelta della modalità (per esempio Klarna: subito, a 30 giorni, a rate): nomi senza logo, il marchio è già nel
+    // riquadro scelto e nell'intestazione
+    private fun chooseMode(p: JSONObject, family: String, modes: List<String>) {
+        val u = light
+        val pg = u.page(center = false)
+        header(u, pg, p, method = family)
+        u.add(pg.body, u.text(s(R.string.terminal_choose_mode), Type.LABEL, u.p.muted, center = false), top = 16f, gravity = Gravity.START)
+        for (m in modes) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = Halba.px(this@MainActivity, 72f)
+                setPadding(Halba.px(this@MainActivity, 20f), 0, Halba.px(this@MainActivity, 20f), 0)
+                background = Halba.rounded(this@MainActivity, u.p.surface, Halba.R_TILE, u.p.borderStrong)
+                addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink, center = false))
+                isClickable = true
+                contentDescription = labels[m] ?: m
+                setOnClickListener { payByQr(p, m) }
+            }
+            u.add(pg.body, row, top = 8f)
+        }
+        pg.bottom.addView(u.textButton(s(R.string.terminal_back)) { choose(p) })
+        show(pg.root)
+    }
+
     // Marchi ufficiali dei metodi: asset marks/<metodo>.png (forniti dai circuiti, dal design system di halba)
     private val marks = mutableMapOf<String, android.graphics.Bitmap?>()
     private fun methodMark(m: String): android.graphics.Bitmap? = marks.getOrPut(m) {
@@ -1261,7 +1291,7 @@ class MainActivity : AppCompatActivity() {
                     val st = runCatching { api.payment(id) }.getOrNull()
                     when (st?.optString("status")) {
                         "succeeded" -> { result(p, "ok", null, card = JSONObject().put("entry_mode", "qr").put("method", method)); return@launch }
-                        "canceled" -> { result(p, "till", null); return@launch }
+                        "canceled" -> { if (st.optJSONObject("failure")?.optString("code") == "canceled") result(p, "fail", "canceled") else result(p, "till", null); return@launch }
                         "failed" -> { result(p, "fail", reason(st.optJSONObject("failure")?.optString("code"))); return@launch }
                     }
                 }

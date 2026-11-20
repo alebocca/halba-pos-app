@@ -117,4 +117,13 @@
     <string name="terminal_boot" formatted="false">Starting halba</string>
     <string name="terminal_pending_title" formatted="false">Confirming the payment</string>
     <string name="terminal_pending_do" formatted="false">The card was read. Don\'t pay again: the outcome will appear on the till shortly.</string>
+    <string name="terminal_receipt_ok" formatted="false">PAYMENT APPROVED</string>
+    <string name="terminal_receipt_canceled" formatted="false">PAYMENT CANCELLED</string>
+    <string name="terminal_receipt_declined" formatted="false">PAYMENT DECLINED</string>
+    <string name="terminal_receipt_expired" formatted="false">PAYMENT NOT COMPLETED</string>
+    <string name="terminal_receipt_method" formatted="false">Method</string>
+    <string name="terminal_receipt_amount" formatted="false">Amount</string>
+    <string name="terminal_receipt_order" formatted="false">Order</string>
+    <string name="terminal_receipt_ref" formatted="false">halba ref.</string>
+    <string name="terminal_receipt_thanks" formatted="false">Thank you</string>
 </resources>

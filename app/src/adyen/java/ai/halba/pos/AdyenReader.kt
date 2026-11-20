@@ -122,6 +122,30 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         }
     }
 
+    // Scontrino stampato dall'app di pagamento di Adyen con la Terminal API locale (PrintRequest, testo): serve per i
+    // metodi con QR, che Adyen non conosce. Le carte le stampa Adyen da sola (impostazioni receiptPrinting)
+    override suspend fun print(lines: List<ReceiptLine>): Boolean {
+        if (crypto == null || poiid == null) runCatching { connect() }
+        if (crypto == null || poiid == null) return false
+        val text = org.json.JSONArray()
+        for (l in lines) text.put(JSONObject().put("Text", l.text).put("CharacterStyle", if (l.bold) "Bold" else "Normal").put("Alignment", if (l.centred) "Centred" else "Left").put("EndOfLineFlag", true))
+        val header = JSONObject()
+            .put("ProtocolVersion", "3.0").put("MessageClass", "Device").put("MessageCategory", "Print").put("MessageType", "Request")
+            .put("ServiceID", serviceId()).put("SaleID", "halba-receipt").put("POIID", poiid)
+        val req = JSONObject().put("SaleToPOIRequest", JSONObject().put("MessageHeader", header).put("PrintRequest", JSONObject()
+            .put("PrintOutput", JSONObject().put("DocumentQualifier", "CustomerReceipt").put("ResponseMode", "PrintEnd")
+                .put("OutputContent", JSONObject().put("OutputFormat", "Text").put("OutputText", text)))))
+        step("print: sending")
+        return try {
+            val r = send(req, 30_000).optJSONObject("SaleToPOIResponse")?.optJSONObject("PrintResponse")?.optJSONObject("Response")
+            step("print: ${r?.optString("Result") ?: "no response"} ${r?.optString("ErrorCondition").orEmpty()} ${r?.optString("AdditionalResponse").orEmpty().take(60)}".trim())
+            r?.optString("Result") == "Success"
+        } catch (e: Exception) {
+            step("print error: ${describe(e)}")
+            false
+        }
+    }
+
     private suspend fun abort(a: JSONObject) {
         val body = JSONObject()
             .put("MessageHeader", header("Abort", serviceId(), a.getString("sale_id")))

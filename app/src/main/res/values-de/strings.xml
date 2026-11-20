@@ -117,4 +117,13 @@
     <string name="terminal_boot" formatted="false">halba wird gestartet</string>
     <string name="terminal_pending_title" formatted="false">Zahlung wird bestätigt</string>
     <string name="terminal_pending_do" formatted="false">Die Karte wurde gelesen. Bitte nicht erneut zahlen: das Ergebnis erscheint gleich an der Kasse.</string>
+    <string name="terminal_receipt_ok" formatted="false">ZAHLUNG GENEHMIGT</string>
+    <string name="terminal_receipt_canceled" formatted="false">ZAHLUNG STORNIERT</string>
+    <string name="terminal_receipt_declined" formatted="false">ZAHLUNG ABGELEHNT</string>
+    <string name="terminal_receipt_expired" formatted="false">ZAHLUNG NICHT ABGESCHLOSSEN</string>
+    <string name="terminal_receipt_method" formatted="false">Methode</string>
+    <string name="terminal_receipt_amount" formatted="false">Betrag</string>
+    <string name="terminal_receipt_order" formatted="false">Bestellung</string>
+    <string name="terminal_receipt_ref" formatted="false">halba-Ref.</string>
+    <string name="terminal_receipt_thanks" formatted="false">Vielen Dank</string>
 </resources>

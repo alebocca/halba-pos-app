@@ -1209,6 +1209,7 @@ class MainActivity : AppCompatActivity() {
         var job: Job? = null
         job = lifecycleScope.launch {
             val r = try { api.qr(id, method) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { result(p, "fail", "read"); return@launch }
+            qrMethod = method
             val pg = u.page(center = false)
             header(u, pg, p, method = method)
             val qrName = labels[method] ?: method
@@ -1273,10 +1274,40 @@ class MainActivity : AppCompatActivity() {
         window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
     }
 
+    // Scontrino del pagamento con QR: negozio, data, metodo, importo, ordine, riferimento halba, esito
+    private var qrMethod: String? = null
+    private fun printQrReceipt(p: JSONObject, method: String, kind: String, why: String?) {
+        val merchant = config?.optJSONObject("merchant")?.optString("name")?.takeIf { it.isNotEmpty() && it != "null" }
+        val store = config?.optJSONObject("store")?.optString("name")?.takeIf { it.isNotEmpty() && it != "null" }
+        val outcome = s(when {
+            kind == "ok" -> R.string.terminal_receipt_ok
+            kind == "till" || why == "canceled" -> R.string.terminal_receipt_canceled
+            why == "timeout" -> R.string.terminal_receipt_expired
+            else -> R.string.terminal_receipt_declined
+        })
+        val ref = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" }
+        val lines = buildList {
+            merchant?.let { add(ReceiptLine(it, bold = true, centred = true)) }
+            store?.let { add(ReceiptLine(it, centred = true)) }
+            add(ReceiptLine(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date()), centred = true))
+            add(ReceiptLine(" "))
+            add(ReceiptLine("${s(R.string.terminal_receipt_method)}: ${labels[method] ?: method}"))
+            add(ReceiptLine("${s(R.string.terminal_receipt_amount)}: ${amountOf(p)}", bold = true))
+            ref?.let { add(ReceiptLine("${s(R.string.terminal_receipt_order)}: $it")) }
+            add(ReceiptLine("${s(R.string.terminal_receipt_ref)}: ${p.optString("id")}"))
+            add(ReceiptLine(" "))
+            add(ReceiptLine(outcome, bold = true, centred = true))
+            if (kind == "ok") add(ReceiptLine(s(R.string.terminal_receipt_thanks), centred = true))
+        }
+        lifecycleScope.launch { runCatching { reader.print(lines) } }
+    }
+
     // --- F. Esito: torna a riposo da solo dopo 4 s (barra di 8 dp e conto alla rovescia) ---
     private fun result(p: JSONObject, kind: String, why: String?, test: Boolean = false, card: JSONObject? = null) {
         collecting = false
         onReturn = null
+        // Metodo con QR: lo scontrino lo stampa halba, con ogni esito (le carte le stampa l'app di pagamento del PSP)
+        qrMethod?.let { m -> qrMethod = null; if (kind != "pending") printQrReceipt(p, m, kind, why) }
         val u = light
         val pg = u.page()
         val spoken: String

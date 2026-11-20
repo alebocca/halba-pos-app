@@ -19,7 +19,8 @@ interface CardReader {
     val diagnostics: String? get() = null
     // Stampa sulla stampante del terminale (scontrino dei metodi con QR, che il PSP non conosce): righe di testo,
     // in grassetto e centrate se richiesto. false se il terminale non stampa
-    suspend fun print(lines: List<ReceiptLine>): Boolean = false
+    // xhtml: versione con il logo (principale); se il terminale non la stampa, si usano le righe di testo
+    suspend fun print(lines: List<ReceiptLine>, xhtml: String? = null): Boolean = false
 }
 
-data class ReceiptLine(val text: String, val bold: Boolean = false, val centred: Boolean = false)
+data class ReceiptLine(val text: String, val bold: Boolean = false, val centred: Boolean = false, val doubleWidth: Boolean = false, val doubleHeight: Boolean = false)

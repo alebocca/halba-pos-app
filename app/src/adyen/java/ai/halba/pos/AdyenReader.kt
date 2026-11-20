@@ -124,24 +124,37 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
 
     // Scontrino stampato dall'app di pagamento di Adyen con la Terminal API locale (PrintRequest, testo): serve per i
     // metodi con QR, che Adyen non conosce. Le carte le stampa Adyen da sola (impostazioni receiptPrinting)
-    override suspend fun print(lines: List<ReceiptLine>): Boolean {
+    override suspend fun print(lines: List<ReceiptLine>, xhtml: String?): Boolean {
         if (crypto == null || poiid == null) runCatching { connect() }
         if (crypto == null || poiid == null) return false
+        // Prima la versione XHTML con il logo (tutto il documento in Base64, come chiede Adyen); se non stampa, il testo
+        if (xhtml != null) {
+            val content = JSONObject().put("OutputFormat", "XHTML").put("OutputXHTML", java.util.Base64.getEncoder().encodeToString(xhtml.toByteArray(Charsets.UTF_8)))
+            if (printRequest(content, "print xhtml")) return true
+        }
         val text = org.json.JSONArray()
-        for (l in lines) text.put(JSONObject().put("Text", l.text).put("CharacterStyle", if (l.bold) "Bold" else "Normal").put("Alignment", if (l.centred) "Centred" else "Left").put("EndOfLineFlag", true))
+        for (l in lines) {
+            val o = JSONObject().put("Text", l.text).put("CharacterStyle", if (l.bold) "Bold" else "Normal").put("Alignment", if (l.centred) "Centred" else "Left").put("EndOfLineFlag", true)
+            if (l.doubleWidth) o.put("CharacterWidth", "DoubleWidth")
+            if (l.doubleHeight) o.put("CharacterHeight", "DoubleHeight")
+            text.put(o)
+        }
+        return printRequest(JSONObject().put("OutputFormat", "Text").put("OutputText", text), "print text")
+    }
+
+    private suspend fun printRequest(content: JSONObject, what: String): Boolean {
         val header = JSONObject()
             .put("ProtocolVersion", "3.0").put("MessageClass", "Device").put("MessageCategory", "Print").put("MessageType", "Request")
             .put("ServiceID", serviceId()).put("SaleID", "halba-receipt").put("POIID", poiid)
         val req = JSONObject().put("SaleToPOIRequest", JSONObject().put("MessageHeader", header).put("PrintRequest", JSONObject()
-            .put("PrintOutput", JSONObject().put("DocumentQualifier", "CustomerReceipt").put("ResponseMode", "PrintEnd")
-                .put("OutputContent", JSONObject().put("OutputFormat", "Text").put("OutputText", text)))))
-        step("print: sending")
+            .put("PrintOutput", JSONObject().put("DocumentQualifier", "CustomerReceipt").put("ResponseMode", "PrintEnd").put("OutputContent", content))))
+        step("$what: sending")
         return try {
             val r = send(req, 30_000).optJSONObject("SaleToPOIResponse")?.optJSONObject("PrintResponse")?.optJSONObject("Response")
-            step("print: ${r?.optString("Result") ?: "no response"} ${r?.optString("ErrorCondition").orEmpty()} ${r?.optString("AdditionalResponse").orEmpty().take(60)}".trim())
+            step("$what: ${r?.optString("Result") ?: "no response"} ${r?.optString("ErrorCondition").orEmpty()} ${r?.optString("AdditionalResponse").orEmpty().take(60)}".trim())
             r?.optString("Result") == "Success"
         } catch (e: Exception) {
-            step("print error: ${describe(e)}")
+            step("$what error: ${describe(e)}")
             false
         }
     }

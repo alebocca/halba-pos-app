@@ -1262,26 +1262,55 @@ class MainActivity : AppCompatActivity() {
         job = lifecycleScope.launch {
             val r = try { api.qr(id, method) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { result(p, "fail", "read"); return@launch }
             qrMethod = method
+            // Design system, terminal.md sezione E: tutto nello schermo senza scorrere. In alto l'importo (44 sp) con il
+            // marchio halba a destra, poi l'istruzione (24 sp); il riquadro bianco con il codice e il marchio del metodo
+            // sotto; riga del tempo e barra; Annulla in fondo
             val pg = u.page(center = false)
-            header(u, pg, p, method = method)
+            val dp = { v: Float -> Halba.px(this@MainActivity, v) }
+            val top = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(24f), dp(16f), dp(24f), 0)
+                addView(u.text(amountOf(p), Type.TITLE, u.p.ink, center = false).apply { textSize = 44f; setTypeface(typeface, android.graphics.Typeface.BOLD); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(HalbaMark(this@MainActivity, ring = u.p.ink, dot = u.accent.accent), LinearLayout.LayoutParams(dp(28f), dp(28f)))
+            }
+            pg.header.addView(top)
             val qrName = labels[method] ?: method
-            u.add(pg.body, u.text(s(R.string.terminal_qr_scan, "m" to qrName), Type.HEADLINE), top = 8f)
-            localLine[method]?.let { u.add(pg.body, u.text(it, Type.LABEL, u.p.muted), top = 4f) }
-            val size = Halba.px(this@MainActivity, Halba.QR)
-            val margin = Halba.px(this@MainActivity, 20f)
-            val box = FrameLayout(this@MainActivity).apply { setBackgroundColor(Color.WHITE); isFocusable = true }
-            val img = ImageView(this@MainActivity).apply { setImageBitmap(qrBitmap(r.optString("qr"), size - 2 * margin)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-            box.addView(img, FrameLayout.LayoutParams(-1, -1).apply { setMargins(margin, margin, margin, margin) })
+            u.add(pg.body, u.text(s(R.string.terminal_qr_scan, "m" to qrName), Type.HEADLINE, u.p.ink, center = false).apply { textSize = 24f; setTypeface(typeface, android.graphics.Typeface.BOLD) }, top = 4f, gravity = Gravity.START)
+            localLine[method]?.let { u.add(pg.body, u.text(it, Type.LABEL, u.p.muted, center = false), top = 2f, gravity = Gravity.START) }
+            // Lato del codice (con la zona di rispetto di 4 moduli): il quadrato più grande che entra tra intestazione e
+            // riga del tempo, tra 200 e 304 dp
+            val dm = resources.displayMetrics
+            val heightDp = dm.heightPixels / dm.density
+            val widthDp = dm.widthPixels / dm.density
+            // Bilancio del design system: 256 dp su 360 × 640 e 304 su 360 × 800 (altezza meno 384 dp di intestazione,
+            // riquadro, tempo e Annulla); la riga nella lingua del metodo toglie altri 20 dp
+            val roomDp = heightDp - 384f - (if (localLine[method] != null) 20f else 0f)
+            val sideDp = minOf(roomDp, widthDp - 48f - 20f, 304f).coerceAtLeast(200f)
+            val size = dp(sideDp)
+            val box = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                background = Halba.rounded(this@MainActivity, Color.WHITE, 16f, u.p.borderStrong, 2f)
+                setPadding(dp(8f), dp(8f), dp(8f), dp(8f))
+                isFocusable = true
+            }
+            val codeFrame = FrameLayout(this@MainActivity)
+            val img = ImageView(this@MainActivity).apply { setImageBitmap(qrBitmap(r.optString("qr"), size)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+            codeFrame.addView(img, FrameLayout.LayoutParams(size, size))
             val over = u.text("", Type.HEADLINE, u.p.ink).apply { gravity = Gravity.CENTER; visibility = View.GONE }
-            box.addView(over, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-            u.add(pg.body, box, top = 16f, width = size, height = size)
+            codeFrame.addView(over, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
+            box.addView(codeFrame, LinearLayout.LayoutParams(size, size))
+            markTile(method)?.let { box.addView(it, LinearLayout.LayoutParams(dp(112f), dp(48f)).apply { topMargin = dp(4f) }) }
+            u.add(pg.body, box, top = 8f, width = -2)
+            val rowWidth = minOf(dm.widthPixels - dp(48f), size + dp(20f))
             val timeRow = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             val leftLbl = u.text(s(R.string.terminal_qr_left), Type.LABEL, u.p.muted, center = false)
-            val clock = u.text("15:00", Type.TEXT, u.p.ink, center = false, mono = true).apply { gravity = Gravity.END }
+            val clock = u.text("15:00", Type.TEXT, u.p.ink, center = false, mono = true).apply { gravity = Gravity.END; textSize = 20f }
             timeRow.addView(leftLbl, LinearLayout.LayoutParams(0, -2, 1f))
             timeRow.addView(clock)
-            u.add(pg.body, timeRow, top = 16f, width = size)
-            val bar = u.add(pg.body, Bar(this@MainActivity, u.p.sunken, u.accent.accent).apply { fraction = 1f }, top = 8f, width = size, height = Halba.px(this@MainActivity, 8f))
+            u.add(pg.body, timeRow, top = 10f, width = rowWidth)
+            val bar = u.add(pg.body, Bar(this@MainActivity, u.p.sunken, u.accent.accent).apply { fraction = 1f }, top = 10f, width = rowWidth, height = dp(8f))
             val actions = pg.bottom
             actions.addView(u.textButton(s(R.string.terminal_cancel)) { cancelByCustomer(p, job) })
             sheet(pg.root)
@@ -1329,29 +1358,26 @@ class MainActivity : AppCompatActivity() {
     // Scontrino del pagamento con QR: negozio, data, metodo, importo, ordine, riferimento halba, esito
     private var qrMethod: String? = null
     private fun printQrReceipt(p: JSONObject, method: String, kind: String, why: String?) {
-        val merchant = config?.optJSONObject("merchant")?.optString("name")?.takeIf { it.isNotEmpty() && it != "null" }
-        val store = config?.optJSONObject("store")?.optString("name")?.takeIf { it.isNotEmpty() && it != "null" }
-        val outcome = s(when {
-            kind == "ok" -> R.string.terminal_receipt_ok
-            kind == "till" || why == "canceled" -> R.string.terminal_receipt_canceled
-            why == "timeout" -> R.string.terminal_receipt_expired
-            else -> R.string.terminal_receipt_declined
-        })
-        val ref = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" }
-        val lines = buildList {
-            merchant?.let { add(ReceiptLine(it, bold = true, centred = true)) }
-            store?.let { add(ReceiptLine(it, centred = true)) }
-            add(ReceiptLine(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date()), centred = true))
-            add(ReceiptLine(" "))
-            add(ReceiptLine("${s(R.string.terminal_receipt_method)}: ${labels[method] ?: method}"))
-            add(ReceiptLine("${s(R.string.terminal_receipt_amount)}: ${amountOf(p)}", bold = true))
-            ref?.let { add(ReceiptLine("${s(R.string.terminal_receipt_order)}: $it")) }
-            add(ReceiptLine("${s(R.string.terminal_receipt_ref)}: ${p.optString("id")}"))
-            add(ReceiptLine(" "))
-            add(ReceiptLine(outcome, bold = true, centred = true))
-            if (kind == "ok") add(ReceiptLine(s(R.string.terminal_receipt_thanks), centred = true))
+        val cfg = config
+        val str = { o: String, k: String -> cfg?.optJSONObject(o)?.optString(k)?.takeIf { it.isNotEmpty() && it != "null" } }
+        val outcome = when {
+            kind == "ok" -> Receipt.Outcome.APPROVED
+            kind == "till" || why == "canceled" -> Receipt.Outcome.CANCELLED
+            why == "timeout" -> Receipt.Outcome.INCOMPLETE
+            else -> Receipt.Outcome.DECLINED
         }
-        lifecycleScope.launch { runCatching { reader.print(lines) } }
+        val lang = java.util.Locale.getDefault().language.let { if (it in setOf("it", "en", "de")) it else "en" }
+        val amount = p.getJSONObject("amount")
+        val d = Receipt.Data(
+            lang = lang, merchant = str("merchant", "name"), store = str("store", "name"), at = java.util.Calendar.getInstance(),
+            terminal = str("terminal", "label"), method = labels[method] ?: method,
+            order = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" && it != "halba-setup-test" },
+            halbaRef = p.optString("id"), amountMinor = amount.getLong("value"), currency = amount.getString("currency"),
+            outcome = outcome, reason = if (outcome == Receipt.Outcome.DECLINED) Receipt.reasonKey(why) else null,
+        )
+        // Logo di halba (design system, terminal/receipt): il logo del merchant arriverà dalla dashboard
+        val logo = runCatching { assets.open("receipt/halba-receipt-logo-384x156.png").use { java.util.Base64.getEncoder().encodeToString(it.readBytes()) } }.getOrNull()
+        lifecycleScope.launch { runCatching { reader.print(Receipt.text(d), Receipt.xhtml(d, logo)) } }
     }
 
     // --- F. Esito: torna a riposo da solo dopo 4 s (barra di 8 dp e conto alla rovescia) ---
@@ -1438,8 +1464,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     // QR senza logo al centro e con moduli quadrati; il margine bianco lo dà il riquadro
+    // Codice con la sua zona di rispetto di 4 moduli (design system: il lato comprende la zona di rispetto)
     private fun qrBitmap(content: String, size: Int): Bitmap {
-        val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 0))
+        val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 4))
         val pixels = IntArray(size * size) { i -> if (m[i % size, i / size]) Color.BLACK else Color.WHITE }
         return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.RGB_565)
     }

@@ -127,10 +127,12 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
     override suspend fun print(lines: List<ReceiptLine>, xhtml: String?): Boolean {
         if (crypto == null || poiid == null) runCatching { connect() }
         if (crypto == null || poiid == null) return false
-        // Prima la versione XHTML con il logo (tutto il documento in Base64, come chiede Adyen); se non stampa, il testo
-        if (xhtml != null) {
+        // XHTML con il logo: l'app di pagamento risponde Success ma sull'S1F2 non stampa nulla (prova del 21/11). Finché
+        // non è chiarito con Adyen, lo scontrino è la versione di testo, che stampa; in test si prova anche l'XHTML come
+        // "Document" (il qualificatore che Adyen indica per l'XHTML), per vedere se esce
+        if (xhtml != null && xhtmlTrial) {
             val content = JSONObject().put("OutputFormat", "XHTML").put("OutputXHTML", java.util.Base64.getEncoder().encodeToString(xhtml.toByteArray(Charsets.UTF_8)))
-            if (printRequest(content, "print xhtml")) return true
+            printRequest(content, "print xhtml", "Document")
         }
         val text = org.json.JSONArray()
         for (l in lines) {
@@ -142,12 +144,15 @@ class AdyenReader(private val api: HalbaApi) : CardReader {
         return printRequest(JSONObject().put("OutputFormat", "Text").put("OutputText", text), "print text")
     }
 
-    private suspend fun printRequest(content: JSONObject, what: String): Boolean {
+    // Prova dell'XHTML solo nell'ambiente di test (lo scontrino di testo si stampa comunque)
+    private val xhtmlTrial: Boolean get() = environment == "test"
+
+    private suspend fun printRequest(content: JSONObject, what: String, qualifier: String = "CustomerReceipt"): Boolean {
         val header = JSONObject()
             .put("ProtocolVersion", "3.0").put("MessageClass", "Device").put("MessageCategory", "Print").put("MessageType", "Request")
             .put("ServiceID", serviceId()).put("SaleID", "halba-receipt").put("POIID", poiid)
         val req = JSONObject().put("SaleToPOIRequest", JSONObject().put("MessageHeader", header).put("PrintRequest", JSONObject()
-            .put("PrintOutput", JSONObject().put("DocumentQualifier", "CustomerReceipt").put("ResponseMode", "PrintEnd").put("OutputContent", content))))
+            .put("PrintOutput", JSONObject().put("DocumentQualifier", qualifier).put("ResponseMode", "PrintEnd").put("OutputContent", content))))
         step("$what: sending")
         return try {
             val r = send(req, 30_000).optJSONObject("SaleToPOIResponse")?.optJSONObject("PrintResponse")?.optJSONObject("Response")

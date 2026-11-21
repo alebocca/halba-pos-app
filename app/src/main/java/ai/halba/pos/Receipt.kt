@@ -173,7 +173,7 @@ object Receipt {
         val outcomeKey = when (d.outcome) { Outcome.APPROVED -> "approved"; Outcome.DECLINED -> "declined"; Outcome.CANCELLED -> "cancelled"; Outcome.INCOMPLETE -> "incomplete" }
         val reasonKey = when (d.outcome) { Outcome.DECLINED -> d.reason ?: "r_generic"; Outcome.CANCELLED -> "r_cancelled"; Outcome.INCOMPLETE -> "r_qr_expired"; else -> null }
         val b = StringBuilder()
-        b.append("""<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" lang="${d.lang}"><head><title>receipt</title></head><body style="width:384px;margin:0;font-size:20px;line-height:26px">""")
+        b.append("""<html xmlns="http://www.w3.org/1999/xhtml" lang="${d.lang}"><body style="width:384px;margin:0;font-size:20px;line-height:26px">""")
         if (logoPngBase64 != null) b.append("""<p style="text-align:center;margin:0"><img src="data:image/png;base64,$logoPngBase64" width="384" alt=""/></p>""")
         d.merchant?.let { b.append(p(it, "font-weight:bold;font-size:22px")) }
         d.store?.let { b.append(p(it)) }

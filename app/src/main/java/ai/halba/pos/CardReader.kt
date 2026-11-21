@@ -15,4 +15,12 @@ interface CardReader {
     fun canPayByCard(payment: JSONObject): Boolean
     val cardHint: String //                   riga sotto l'importo mentre si aspetta la carta
     suspend fun collect(payment: JSONObject) //  carta letta e confermata presso il PSP; eccezione se non va
+    // Ultimo passo del lettore (collegamento, invio, risposta, errore), mandato a halba per la diagnosi a distanza
+    val diagnostics: String? get() = null
+    // Stampa sulla stampante del terminale (scontrino dei metodi con QR, che il PSP non conosce): righe di testo,
+    // in grassetto e centrate se richiesto. false se il terminale non stampa
+    // xhtml: versione con il logo (principale); se il terminale non la stampa, si usano le righe di testo
+    suspend fun print(lines: List<ReceiptLine>, xhtml: String? = null): Boolean = false
 }
+
+data class ReceiptLine(val text: String, val bold: Boolean = false, val centred: Boolean = false, val doubleWidth: Boolean = false, val doubleHeight: Boolean = false)

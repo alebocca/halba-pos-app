@@ -115,4 +115,17 @@
     <string name="terminal_nonet_text" formatted="false">La cassa non può inviare pagamenti a questo terminale in questo momento.</string>
     <string name="terminal_nonet_try" formatted="false">Nuovo tentativo in corso…</string>
     <string name="terminal_boot" formatted="false">Avvio di halba</string>
+    <string name="terminal_pending_title" formatted="false">Esito in verifica</string>
+    <string name="terminal_pending_do" formatted="false">La carta è stata letta. Non ripetere il pagamento: l\'esito comparirà a breve sulla cassa.</string>
+    <string name="terminal_receipt_ok" formatted="false">PAGAMENTO APPROVATO</string>
+    <string name="terminal_receipt_canceled" formatted="false">PAGAMENTO ANNULLATO</string>
+    <string name="terminal_receipt_declined" formatted="false">PAGAMENTO RIFIUTATO</string>
+    <string name="terminal_receipt_expired" formatted="false">PAGAMENTO NON COMPLETATO</string>
+    <string name="terminal_receipt_method" formatted="false">Metodo</string>
+    <string name="terminal_receipt_amount" formatted="false">Importo</string>
+    <string name="terminal_receipt_order" formatted="false">Ordine</string>
+    <string name="terminal_receipt_ref" formatted="false">Rif. halba</string>
+    <string name="terminal_receipt_thanks" formatted="false">Grazie</string>
+    <string name="terminal_choose_mode" formatted="false">Scegli come pagare</string>
+    <string name="terminal_native_follow" formatted="false">Inquadra il codice con {m} sul terminale</string>
 </resources>

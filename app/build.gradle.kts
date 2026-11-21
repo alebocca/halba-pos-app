@@ -11,8 +11,8 @@ android {
         applicationId = "ai.halba.pos"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 13
+        versionName = "0.3.1"
         // Sandbox di halba: in produzione https://api.halba.ai
         buildConfigField("String", "HALBA_API", "\"https://api.sandbox.halba.ai\"")
     }
@@ -52,4 +52,7 @@ dependencies {
     // Video dello schermo a riposo: loop senza fotogramma nero (REPEAT_MODE_ALL), senza audio
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
+    // Test JVM (cifratura della Terminal API locale di Adyen): org.json vero, non lo stub di Android
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

@@ -13,6 +13,8 @@ class HalbaApi(private val base: String) {
     var deviceKey: String? = null
     // Il terminale dice a halba se è in carica (la dashboard avvisa il merchant quando non lo è)
     var charging: () -> Boolean? = { null }
+    // Stato del lettore di carte (diagnosi a distanza: sui terminali non si leggono i log)
+    var readerStatus: () -> String? = { null }
 
     // body: l'errore dell'API (per il PIN: attempts_left, locked_seconds)
     class ApiError(val status: Int, message: String, val body: JSONObject = JSONObject()) : Exception(message)
@@ -30,6 +32,7 @@ class HalbaApi(private val base: String) {
             val key = deviceKey
             if (id != null && key != null) conn.setRequestProperty("Authorization", "Device $id.$key")
             charging()?.let { conn.setRequestProperty("X-Charging", it.toString()) }
+            readerStatus()?.let { conn.setRequestProperty("X-Reader-Status", it.replace(Regex("[^\\x20-\\x7E]"), "?").take(300)) }
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (body != null) {
                 conn.doOutput = true
@@ -57,6 +60,8 @@ class HalbaApi(private val base: String) {
         if (code != null || message != null) body.put("failure", JSONObject().put("code", code ?: status).put("message", message ?: ""))
         return call("POST", "/v1/devices/payments/$id/result", body)
     }
+    // QR gestito dall'app di pagamento del PSP (Alipay, WeChat Pay su Adyen): halba prepara la richiesta per quel metodo
+    suspend fun native(id: String, method: String): JSONObject = call("POST", "/v1/devices/payments/$id/native", JSONObject().put("method", method))
     suspend fun qr(id: String, method: String): JSONObject = call("POST", "/v1/devices/payments/$id/qr", JSONObject().put("method", method))
 
     // Configurazione: negozio, nome, PIN impostato, schermo a riposo (link temporaneo al file)

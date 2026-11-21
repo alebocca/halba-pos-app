@@ -87,7 +87,13 @@ class MainActivity : AppCompatActivity() {
     private var statusPill: View? = null
     private var powerPill: View? = null
 
-    private val labels = mapOf("card" to "Card", "alipay" to "Alipay", "wechatpay" to "WeChat Pay", "bizum" to "Bizum", "blik" to "BLIK", "twint" to "TWINT")
+    // Nomi ufficiali dei metodi (stessa grafia della pagina di pagamento di halba)
+    private val labels = mapOf(
+        "card" to "Card", "alipay" to "Alipay", "wechatpay" to "WeChat Pay", "bizum" to "Bizum", "blik" to "BLIK", "twint" to "TWINT",
+        "paypal" to "PayPal", "klarna" to "Klarna", "klarna_paynow" to "Klarna Pay Now", "klarna_account" to "Klarna Pay Over Time",
+        "clearpay" to "Clearpay", "ideal" to "iDEAL | Wero", "eps" to "EPS", "trustly" to "Trustly", "mbway" to "MB WAY",
+        "scalapay" to "Scalapay", "apple_pay" to "Apple Pay", "google_pay" to "Google Pay",
+    )
     // Istruzione del QR nella lingua del metodo (8.3)
     private val localLine = mapOf("alipay" to "请使用支付宝扫码", "wechatpay" to "请使用微信扫码", "bizum" to "Escanea con Bizum", "blik" to "Zeskanuj w aplikacji banku")
 
@@ -129,11 +135,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(container)
         // Terminale da banco in kiosk: niente barre di sistema (riappaiono con uno scorrimento dal bordo e si richiudono)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
-        androidx.core.view.WindowInsetsControllerCompat(window, container).apply {
-            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        hideSystemBars()
         reader = Psp.cardReader(api, lifecycleScope)
+        api.readerStatus = { reader.diagnostics }
         secure = SecureStore(this)
         screen = ScreenCache(this, api)
         api.charging = { isCharging() }
@@ -158,7 +162,23 @@ class MainActivity : AppCompatActivity() {
     // Ritorno dall'app del PSP (handoff della carta): "Elaborazione in corso"
     override fun onResume() {
         super.onResume()
+        hideSystemBars()
         if (collecting) onReturn?.invoke()
+    }
+
+    // L'app di pagamento del PSP (Adyen, Stripe) mostra le sue schermate sopra la nostra e al ritorno lascia visibili
+    // orologio e barra di stato: appena la finestra torna in primo piano si richiudono
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    // Terminale da banco in kiosk: niente barre di sistema (riappaiono con uno scorrimento dal bordo e si richiudono)
+    private fun hideSystemBars() {
+        androidx.core.view.WindowInsetsControllerCompat(window, container).apply {
+            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     // Ogni tocco rinvia il ritorno a riposo per inattività
@@ -242,7 +262,8 @@ class MainActivity : AppCompatActivity() {
         try {
             apply(api.config())
             online = true
-            runCatching { reader.init(this@MainActivity); if (!reader.connected) readerInfo = withTimeout(15_000) { reader.connect() } }
+            runCatching { reader.init(this@MainActivity); if (!reader.connected) readerInfo = withTimeout(60_000) { reader.connect() } }
+                .onFailure { readerInfo = "Card reader: ${it.message ?: it.javaClass.simpleName}" }
             runCatching { screen.sync(config?.optJSONObject("screen")) }
             loadLogo()
             waitForCommands()
@@ -494,7 +515,7 @@ class MainActivity : AppCompatActivity() {
         show(pg.root)
         try {
             reader.init(this@MainActivity)
-            if (!reader.connected) readerInfo = withTimeout(15_000) { reader.connect() }
+            if (!reader.connected) readerInfo = withTimeout(60_000) { reader.connect() }
             val ok = setupPage(4, s(R.string.terminal_reader_title), onBack = back)
             u.add(ok.body, u.badge("success"), top = 48f)
             u.add(ok.body, u.text(s(R.string.terminal_reader_ready), Type.HEADLINE), top = 16f).also { announce(it, s(R.string.terminal_reader_ready), false) }
@@ -981,7 +1002,23 @@ class MainActivity : AppCompatActivity() {
         when (val m = p.optString("method").takeIf { it.isNotEmpty() && it != "null" }) {
             null -> choose(p)
             "card" -> if (reader.canPayByCard(p)) payByCard(p) else result(p, "fail", "read")
-            else -> payByQr(p, m)
+            else -> payByMethod(p, m)
+        }
+    }
+
+    // Metodo con QR: quelli dell'app di pagamento del PSP (Alipay, WeChat Pay su Adyen) vanno all'app di pagamento come
+    // la carta (il QR lo mostra il PSP); gli altri con la pagina di halba
+    private fun isNative(p: JSONObject, m: String): Boolean {
+        val n = p.optJSONArray("native") ?: return false
+        return (0 until n.length()).any { n.optString(it) == m }
+    }
+    private fun payByMethod(p: JSONObject, m: String) {
+        if (!isNative(p, m)) return payByQr(p, m)
+        // Richiesta già pronta (metodo scelto dalla cassa) o da chiedere a halba (scelto qui sul terminale)
+        if (p.optJSONObject("adyen") != null && p.optString("method") == m) return payByCard(p, native = m)
+        lifecycleScope.launch {
+            val np = try { api.native(p.getString("id"), m) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { result(p, "fail", "read"); return@launch }
+            payByCard(np, native = m)
         }
     }
 
@@ -999,7 +1036,11 @@ class MainActivity : AppCompatActivity() {
         val ref = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" && it != "halba-setup-test" }
         if (ref != null) u.add(pg.body, u.text(s(R.string.terminal_ref, "r" to ref), Type.LABEL, u.p.muted))
         if (amountLabel) u.add(pg.body, u.text(s(R.string.terminal_card_amount_lbl), Type.LABEL, u.p.muted), top = 4f)
-        if (method != null) u.add(pg.body, u.text(labels[method] ?: method, Type.HEADLINE), top = 4f)
+        // Schermata del QR: marchio del metodo (se c'è il file) con il nome
+        if (method != null) {
+            markTile(method)?.let { t -> u.add(pg.body, t, top = 8f, width = Halba.px(this, 112f), height = Halba.px(this, 48f)) }
+            u.add(pg.body, u.text(labels[method] ?: method, Type.HEADLINE), top = 4f)
+        }
         u.add(pg.body, u.amount(amountOf(p)), top = 4f)
     }
 
@@ -1029,7 +1070,8 @@ class MainActivity : AppCompatActivity() {
             }
             u.add(pg.body, tile, top = 24f)
         }
-        val qr = all.filter { it != "card" }
+        // Metodi con più modalità (Klarna, Klarna Pay Now, Klarna Pay Over Time): un solo riquadro con il marchio
+        val qr = all.filter { it != "card" }.map { familyOf(it) }.distinct()
         if (qr.isNotEmpty()) {
             u.add(pg.body, u.text(s(R.string.terminal_or_qr), Type.LABEL, u.p.muted, center = false), top = 24f, gravity = Gravity.START)
             // Metodi con QR su due colonne (8 dp), l'ultimo dispari a tutta larghezza; i marchi ufficiali sono da inserire
@@ -1042,11 +1084,15 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
                     background = Halba.rounded(this@MainActivity, u.p.surface, Halba.R_TILE, u.p.borderStrong)
-                    addView(Icon(this@MainActivity, "qr", u.p.ink), LinearLayout.LayoutParams(Halba.px(this@MainActivity, 28f), Halba.px(this@MainActivity, 28f)))
-                    addView(u.text(labels[m] ?: m, Type.LABEL, u.p.ink))
+                    // Design system (terminal.md, scelta del metodo): marchio ufficiale alto 40 dp sul suo fondo
+                    // consentito; finché il file del marchio non c'è, il nome con la grafia ufficiale
+                    val mark = markTile(m)
+                    if (mark != null) addView(mark, LinearLayout.LayoutParams(Halba.px(this@MainActivity, 112f), Halba.px(this@MainActivity, 48f)))
+                    else addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink))
                     isClickable = true
                     contentDescription = labels[m] ?: m
-                    setOnClickListener { payByQr(p, m) }
+                    val modes = all.filter { it != "card" && familyOf(it) == m }
+                    setOnClickListener { if (modes.size > 1) chooseMode(p, m, modes) else payByMethod(p, modes.firstOrNull() ?: m) }
                 }
                 grid.addView(tile, GridLayout.LayoutParams().apply {
                     width = if (full) usable else (usable - gap) / 2
@@ -1065,7 +1111,7 @@ class MainActivity : AppCompatActivity() {
     private fun cancelByCustomer(p: JSONObject, vararg jobs: Job?) {
         jobs.forEach { it?.cancel() }
         collecting = false
-        lifecycleScope.launch { runCatching { api.result(p.getString("id"), "canceled", "canceled", "Canceled on the terminal") } }
+        lifecycleScope.launch { runCatching { api.result(p.getString("id"), "canceled", "canceled", listOfNotNull("Canceled on the terminal", reader.diagnostics).joinToString(" · ")) } }
         result(p, "fail", "canceled")
     }
 
@@ -1079,13 +1125,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     // --- D. Carta: "Avvicina, inserisci o striscia", passaggio al lettore del PSP, ritorno ed elaborazione ---
-    private fun payByCard(p: JSONObject, test: Boolean = false) {
+    private fun payByCard(p: JSONObject, test: Boolean = false, native: String? = null) {
         val u = light
         val pg = u.page()
         header(u, pg, p, amountLabel = true)
-        u.add(pg.body, CardArt(this, u.p, u.accent.accent), top = 24f, width = Halba.px(this, 200f), height = Halba.px(this, 128f))
-        u.add(pg.body, u.text(s(R.string.terminal_card_tap), Type.TITLE).apply { textSize = 30f }, top = 24f)
+        if (native != null) {
+            // Alipay, WeChat Pay: il QR lo mostra l'app di pagamento del PSP
+            markTile(native)?.let { u.add(pg.body, it, top = 24f, width = Halba.px(this, 112f), height = Halba.px(this, 48f)) }
+            u.add(pg.body, u.text(s(R.string.terminal_native_follow, "m" to (labels[native] ?: native)), Type.TITLE), top = 24f)
+        } else {
+            u.add(pg.body, CardArt(this, u.p, u.accent.accent), top = 24f, width = Halba.px(this, 200f), height = Halba.px(this, 128f))
+            u.add(pg.body, u.text(s(R.string.terminal_card_tap), Type.TITLE).apply { textSize = 30f }, top = 24f)
+        }
         u.add(pg.body, waitingRow(u, s(R.string.terminal_card_open)), top = 16f, width = -2)
+        // Ambiente di test: passo del lettore sotto l'attesa, per capire dove si ferma (sul terminale non ci sono log)
+        if (config?.optString("environment") == "test") {
+            val diag = u.add(pg.body, u.text("", Type.CAPTION), top = 12f)
+            lifecycleScope.launch { repeat(400) { (diag as? android.widget.TextView)?.text = reader.diagnostics.orEmpty(); delay(500) } }
+        }
         var job: Job? = null
         var watch: Job? = null
         pg.bottom.addView(u.textButton(s(R.string.terminal_cancel)) { cancelByCustomer(p, job, watch) })
@@ -1100,9 +1157,17 @@ class MainActivity : AppCompatActivity() {
                 withTimeout(60_000) { reader.collect(p) }
                 collecting = false
                 processing(u, p)
-                val r = api.result(id, "confirmed")
+                var r = api.result(id, "confirmed")
+                // Esito non ancora arrivato dal PSP (Adyen: la notifica di Adyen a halba): si rilegge per un minuto
+                val until = System.currentTimeMillis() + 60_000
+                while (r.optString("status") == "processing" && System.currentTimeMillis() < until) {
+                    delay(2000)
+                    r = runCatching { api.payment(id) }.getOrDefault(r)
+                }
                 watch.cancel()
                 if (r.optString("status") == "succeeded") result(p, "ok", null, test, r.optJSONObject("card"))
+                // Carta passata ma conferma del PSP non ancora arrivata a halba: niente errore, la cassa vedrà l'esito
+                else if (r.optString("status") == "processing") result(p, "pending", null, test)
                 else result(p, "fail", reason("${r.optJSONObject("failure")?.optString("code")} ${r.optJSONObject("failure")?.optString("message")}"), test)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 collecting = false; watch.cancel()
@@ -1124,7 +1189,7 @@ class MainActivity : AppCompatActivity() {
         return when {
             "cancel" in t -> "canceled"
             "timeout" in t || "timed out" in t || "expired" in t -> "timeout"
-            "declin" in t || "insufficient" in t || "do_not_honor" in t -> "declined"
+            "declin" in t || "refus" in t || "insufficient" in t || "do_not_honor" in t -> "declined"
             else -> "read"
         }
     }
@@ -1139,6 +1204,56 @@ class MainActivity : AppCompatActivity() {
         announce(pg.body, s(R.string.terminal_processing), assertive = false)
     }
 
+    // Famiglia del metodo: le modalità dello stesso marchio stanno sotto un solo riquadro
+    private fun familyOf(m: String) = if (m.startsWith("klarna")) "klarna" else m
+
+    // Scelta della modalità (per esempio Klarna: subito, a 30 giorni, a rate): nomi senza logo, il marchio è già nel
+    // riquadro scelto e nell'intestazione
+    private fun chooseMode(p: JSONObject, family: String, modes: List<String>) {
+        val u = light
+        val pg = u.page(center = false)
+        header(u, pg, p, method = family)
+        u.add(pg.body, u.text(s(R.string.terminal_choose_mode), Type.LABEL, u.p.muted, center = false), top = 16f, gravity = Gravity.START)
+        for (m in modes) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = Halba.px(this@MainActivity, 72f)
+                setPadding(Halba.px(this@MainActivity, 20f), 0, Halba.px(this@MainActivity, 20f), 0)
+                background = Halba.rounded(this@MainActivity, u.p.surface, Halba.R_TILE, u.p.borderStrong)
+                addView(u.text(labels[m] ?: m, Type.HEADLINE, u.p.ink, center = false))
+                isClickable = true
+                contentDescription = labels[m] ?: m
+                setOnClickListener { payByMethod(p, m) }
+            }
+            u.add(pg.body, row, top = 8f)
+        }
+        pg.bottom.addView(u.textButton(s(R.string.terminal_back)) { choose(p) })
+        show(pg.root)
+    }
+
+    // Marchi ufficiali dei metodi: asset marks/<metodo>.png (forniti dai circuiti, dal design system di halba)
+    private val marks = mutableMapOf<String, android.graphics.Bitmap?>()
+    private fun methodMark(m: String): android.graphics.Bitmap? = marks.getOrPut(m) {
+        runCatching { assets.open("marks/$m.png").use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+    }
+
+    // Riquadro del marchio (design system, checkout/methods/methods.json): 112 × 48 dp senza cornice propria, immagine
+    // dentro 96 × 32, colore del riquadro per metodo (nero TWINT, rosa Klarna, giallo iDEAL | Wero, bianco gli altri)
+    private val tileColour = mapOf("twint" to 0xFF000000.toInt(), "klarna" to 0xFFFFA8CD.toInt(), "klarna_paynow" to 0xFFFFA8CD.toInt(), "klarna_account" to 0xFFFFA8CD.toInt(), "ideal" to 0xFFFFF48D.toInt())
+    private fun markTile(m: String): View? {
+        val bmp = methodMark(m) ?: return null
+        return FrameLayout(this).apply {
+            background = Halba.rounded(this@MainActivity, tileColour[m] ?: Color.WHITE, 8f)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(ImageView(this@MainActivity).apply {
+                setImageBitmap(bmp)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, FrameLayout.LayoutParams(Halba.px(this@MainActivity, 96f), Halba.px(this@MainActivity, 32f), Gravity.CENTER))
+        }
+    }
+
     // --- E. QR: 288 dp, nero su bianco, margine bianco di 20 dp; 15 minuti; luminosità al massimo ---
     private fun payByQr(p: JSONObject, method: String) {
         val u = light
@@ -1146,26 +1261,56 @@ class MainActivity : AppCompatActivity() {
         var job: Job? = null
         job = lifecycleScope.launch {
             val r = try { api.qr(id, method) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { result(p, "fail", "read"); return@launch }
+            qrMethod = method
+            // Design system, terminal.md sezione E: tutto nello schermo senza scorrere. In alto l'importo (44 sp) con il
+            // marchio halba a destra, poi l'istruzione (24 sp); il riquadro bianco con il codice e il marchio del metodo
+            // sotto; riga del tempo e barra; Annulla in fondo
             val pg = u.page(center = false)
-            header(u, pg, p, method = method)
+            val dp = { v: Float -> Halba.px(this@MainActivity, v) }
+            val top = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(24f), dp(16f), dp(24f), 0)
+                addView(u.text(amountOf(p), Type.TITLE, u.p.ink, center = false).apply { textSize = 44f; setTypeface(typeface, android.graphics.Typeface.BOLD); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(HalbaMark(this@MainActivity, ring = u.p.ink, dot = u.accent.accent), LinearLayout.LayoutParams(dp(28f), dp(28f)))
+            }
+            pg.header.addView(top)
             val qrName = labels[method] ?: method
-            u.add(pg.body, u.text(s(R.string.terminal_qr_scan, "m" to qrName), Type.HEADLINE), top = 8f)
-            localLine[method]?.let { u.add(pg.body, u.text(it, Type.LABEL, u.p.muted), top = 4f) }
-            val size = Halba.px(this@MainActivity, Halba.QR)
-            val margin = Halba.px(this@MainActivity, 20f)
-            val box = FrameLayout(this@MainActivity).apply { setBackgroundColor(Color.WHITE); isFocusable = true }
-            val img = ImageView(this@MainActivity).apply { setImageBitmap(qrBitmap(r.optString("qr"), size - 2 * margin)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
-            box.addView(img, FrameLayout.LayoutParams(-1, -1).apply { setMargins(margin, margin, margin, margin) })
+            u.add(pg.body, u.text(s(R.string.terminal_qr_scan, "m" to qrName), Type.HEADLINE, u.p.ink, center = false).apply { textSize = 24f; setTypeface(typeface, android.graphics.Typeface.BOLD) }, top = 4f, gravity = Gravity.START)
+            localLine[method]?.let { u.add(pg.body, u.text(it, Type.LABEL, u.p.muted, center = false), top = 2f, gravity = Gravity.START) }
+            // Lato del codice (con la zona di rispetto di 4 moduli): il quadrato più grande che entra tra intestazione e
+            // riga del tempo, tra 200 e 304 dp
+            val dm = resources.displayMetrics
+            val heightDp = dm.heightPixels / dm.density
+            val widthDp = dm.widthPixels / dm.density
+            // Bilancio del design system: 256 dp su 360 × 640 e 304 su 360 × 800 (altezza meno 384 dp di intestazione,
+            // riquadro, tempo e Annulla); la riga nella lingua del metodo toglie altri 20 dp
+            val roomDp = heightDp - 384f - (if (localLine[method] != null) 20f else 0f)
+            val sideDp = minOf(roomDp, widthDp - 48f - 20f, 304f).coerceAtLeast(200f)
+            val size = dp(sideDp)
+            val box = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                background = Halba.rounded(this@MainActivity, Color.WHITE, 16f, u.p.borderStrong, 2f)
+                setPadding(dp(8f), dp(8f), dp(8f), dp(8f))
+                isFocusable = true
+            }
+            val codeFrame = FrameLayout(this@MainActivity)
+            val img = ImageView(this@MainActivity).apply { setImageBitmap(qrBitmap(r.optString("qr"), size)); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+            codeFrame.addView(img, FrameLayout.LayoutParams(size, size))
             val over = u.text("", Type.HEADLINE, u.p.ink).apply { gravity = Gravity.CENTER; visibility = View.GONE }
-            box.addView(over, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-            u.add(pg.body, box, top = 16f, width = size, height = size)
+            codeFrame.addView(over, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
+            box.addView(codeFrame, LinearLayout.LayoutParams(size, size))
+            markTile(method)?.let { box.addView(it, LinearLayout.LayoutParams(dp(112f), dp(48f)).apply { topMargin = dp(4f) }) }
+            u.add(pg.body, box, top = 8f, width = -2)
+            val rowWidth = minOf(dm.widthPixels - dp(48f), size + dp(20f))
             val timeRow = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             val leftLbl = u.text(s(R.string.terminal_qr_left), Type.LABEL, u.p.muted, center = false)
-            val clock = u.text("15:00", Type.TEXT, u.p.ink, center = false, mono = true).apply { gravity = Gravity.END }
+            val clock = u.text("15:00", Type.TEXT, u.p.ink, center = false, mono = true).apply { gravity = Gravity.END; textSize = 20f }
             timeRow.addView(leftLbl, LinearLayout.LayoutParams(0, -2, 1f))
             timeRow.addView(clock)
-            u.add(pg.body, timeRow, top = 16f, width = size)
-            val bar = u.add(pg.body, Bar(this@MainActivity, u.p.sunken, u.accent.accent).apply { fraction = 1f }, top = 8f, width = size, height = Halba.px(this@MainActivity, 8f))
+            u.add(pg.body, timeRow, top = 10f, width = rowWidth)
+            val bar = u.add(pg.body, Bar(this@MainActivity, u.p.sunken, u.accent.accent).apply { fraction = 1f }, top = 10f, width = rowWidth, height = dp(8f))
             val actions = pg.bottom
             actions.addView(u.textButton(s(R.string.terminal_cancel)) { cancelByCustomer(p, job) })
             sheet(pg.root)
@@ -1197,7 +1342,7 @@ class MainActivity : AppCompatActivity() {
                     val st = runCatching { api.payment(id) }.getOrNull()
                     when (st?.optString("status")) {
                         "succeeded" -> { result(p, "ok", null, card = JSONObject().put("entry_mode", "qr").put("method", method)); return@launch }
-                        "canceled" -> { result(p, "till", null); return@launch }
+                        "canceled" -> { if (st.optJSONObject("failure")?.optString("code") == "canceled") result(p, "fail", "canceled") else result(p, "till", null); return@launch }
                         "failed" -> { result(p, "fail", reason(st.optJSONObject("failure")?.optString("code"))); return@launch }
                     }
                 }
@@ -1210,10 +1355,37 @@ class MainActivity : AppCompatActivity() {
         window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
     }
 
+    // Scontrino del pagamento con QR: negozio, data, metodo, importo, ordine, riferimento halba, esito
+    private var qrMethod: String? = null
+    private fun printQrReceipt(p: JSONObject, method: String, kind: String, why: String?) {
+        val cfg = config
+        val str = { o: String, k: String -> cfg?.optJSONObject(o)?.optString(k)?.takeIf { it.isNotEmpty() && it != "null" } }
+        val outcome = when {
+            kind == "ok" -> Receipt.Outcome.APPROVED
+            kind == "till" || why == "canceled" -> Receipt.Outcome.CANCELLED
+            why == "timeout" -> Receipt.Outcome.INCOMPLETE
+            else -> Receipt.Outcome.DECLINED
+        }
+        val lang = java.util.Locale.getDefault().language.let { if (it in setOf("it", "en", "de")) it else "en" }
+        val amount = p.getJSONObject("amount")
+        val d = Receipt.Data(
+            lang = lang, merchant = str("merchant", "name"), store = str("store", "name"), at = java.util.Calendar.getInstance(),
+            terminal = str("terminal", "label"), method = labels[method] ?: method,
+            order = p.optString("merchant_reference").takeIf { it.isNotEmpty() && it != "null" && it != "halba-setup-test" },
+            halbaRef = p.optString("id"), amountMinor = amount.getLong("value"), currency = amount.getString("currency"),
+            outcome = outcome, reason = if (outcome == Receipt.Outcome.DECLINED) Receipt.reasonKey(why) else null,
+        )
+        // Logo di halba (design system, terminal/receipt): il logo del merchant arriverà dalla dashboard
+        val logo = runCatching { assets.open("receipt/halba-receipt-logo-384x156.png").use { java.util.Base64.getEncoder().encodeToString(it.readBytes()) } }.getOrNull()
+        lifecycleScope.launch { runCatching { reader.print(Receipt.text(d), Receipt.xhtml(d, logo)) } }
+    }
+
     // --- F. Esito: torna a riposo da solo dopo 4 s (barra di 8 dp e conto alla rovescia) ---
     private fun result(p: JSONObject, kind: String, why: String?, test: Boolean = false, card: JSONObject? = null) {
         collecting = false
         onReturn = null
+        // Metodo con QR: lo scontrino lo stampa halba, con ogni esito (le carte le stampa l'app di pagamento del PSP)
+        qrMethod?.let { m -> qrMethod = null; if (kind != "pending") printQrReceipt(p, m, kind, why) }
         val u = light
         val pg = u.page()
         val spoken: String
@@ -1243,6 +1415,12 @@ class MainActivity : AppCompatActivity() {
                     }, top = 16f, width = -2)
                 }
                 spoken = listOfNotNull(title, amountOf(p), what).joinToString(", ")
+            }
+            "pending" -> {
+                u.add(pg.body, u.badge("neutral"))
+                u.add(pg.body, u.text(s(R.string.terminal_pending_title), Type.TITLE), top = 24f)
+                u.add(pg.body, u.text(s(R.string.terminal_pending_do), Type.TEXT), top = 8f)
+                spoken = "${s(R.string.terminal_pending_title)}. ${s(R.string.terminal_pending_do)}"
             }
             "till" -> {
                 u.add(pg.body, u.badge("neutral"))
@@ -1286,8 +1464,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     // QR senza logo al centro e con moduli quadrati; il margine bianco lo dà il riquadro
+    // Codice con la sua zona di rispetto di 4 moduli (design system: il lato comprende la zona di rispetto)
     private fun qrBitmap(content: String, size: Int): Bitmap {
-        val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 0))
+        val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 4))
         val pixels = IntArray(size * size) { i -> if (m[i % size, i / size]) Color.BLACK else Color.WHITE }
         return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.RGB_565)
     }
